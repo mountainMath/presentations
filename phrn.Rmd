@@ -1,6 +1,6 @@
 ---
 title: "What can data tell us about housing in Vancouver?"
-subtitle: "Using data to answer our housing questions"
+subtitle: "Using data to inform our housing questions"
 author: "Jens von Bergmann"
 date: "2017/11/19"
 output:
@@ -8,6 +8,7 @@ output:
     chakra: libs/remark-latest.min.js
     lib_dir: libs
     nature:
+      ratio: '16:9'
       highlightStyle: github
       highlightLines: true
       countIncrementalSlides: false
@@ -22,13 +23,14 @@ options(servr.daemon = TRUE)
 
 class: center, middle
 
-Vancouver housing issues are comples. We are using *data* to understand them. I want to give some examples of how I approach this, and propose a way forward toward collaborative data-driven research.
+Housing issues are complex. We increasingly use *data* to understand them. I want to give some examples of how I approach this, and propose a way forward toward collaborative data-driven research.
 
 ---
 
 # Data Sources
-There are a variety of data sources I have used to look at Vancouver housing issues:
 
+.pull-left[
+There are a variety of data sources I have used to look at Vancouver housing issues:
 * census
 * CMHC
 * CANSIM
@@ -39,11 +41,17 @@ There are a variety of data sources I have used to look at Vancouver housing iss
 * LIDAR data
 * Metro Vancouver Land Use
 * Property Transfer Tax
+]
 
+.pull-right[
 And some I have not used:
 * MLS
 * Land Title data
+* ...
+]
 
+???
+Not all of this data is freely available, but lots of it is.
 ---
 
 # So much data, so little time
@@ -55,8 +63,10 @@ I want to showcase some of these tools.
 ---
 # Interactive Web Maps
 
-Interactive maps are a great way to communicate simple greographic phenomena. If built well, they can easily be adapted to inform on a variety of issues.
+Interactive maps are a great way to communicate simple geographic phenomena. They can often be adapted to inform on a variety of issues.
 
+???
+Great for exploratory analysis
 ---
 # Property Level Data
 
@@ -69,14 +79,18 @@ Examples:
 * [Tax Density](https://mountainmath.ca/assessment_gl/map)
 * [Houses and Dirt](https://mountainmath.ca/assessment/split_map)
 
+???
+Sadly, most useful data is not publicly available. Can be accessed for research through cumbersome process and results can't be shared unless dropping detail and aggregated to high level.
 ---
-background-image: url("/images/houses_and_dirt.png")
+background-image: url("phrn_files/figure-html/houses_and_dirt.png")
 background-position: 50% 50%
 background-size: 100%
 class: center, bottom, inverse
 
 # <a href="https://mountainmath.ca/assessment/split_map" target="_blank">Vancouver Houses And Dirt Demo</a>
 
+???
+A visualization that separates land and improvement values and allows stepping through time and exploring the effect of missing middle housing on prices.
 ---
 
 # CensusMapper
@@ -91,6 +105,8 @@ class: center, bottom, inverse
 
 # <a href="https://censusmapper.ca/maps/731" target="_blank">CensusMapper Demo</a>
 
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
 ---
 
 # Maps aren't analysis
@@ -101,6 +117,8 @@ CensusMapper has APIs to facilitate deeper analysis. Open for all to use.
 
 Let's try and understand the effects of the net migration patterns by age on the age distribution.
 
+???
+While we do need better data, we don't make good use of the data we already have. What's needed most is analysis.
 ---
 
 # Age pyramids
@@ -117,18 +135,17 @@ age_pyramid_styling <- list(
   labs(caption="cancensus, StatCan 2016 census"))
 ```
 
-```{r canada_age, fig.height=3, fig.width=9, message=FALSE, warning=FALSE, dev='svg'}
+```{r canada_age, fig.height=3.5, fig.width=9, message=FALSE, warning=FALSE, dev='svg'}
 library(cancensus)
 library(cancensusHelpers)
-plot_data <- get_age_data(
-  'CA16',list(CSD=c("5915022","5915004","5915055"))) %>% 
+plot_data <- get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %>% 
   rename(City=`Region Name`)
 ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + 
-  geom_bar(stat = "identity") + age_pyramid_styling +
-  facet_wrap("City",nrow=1, scales = "free")
+  geom_bar(stat="identity") + age_pyramid_styling + facet_wrap("City",nrow=1, scales="free")
 ```
 
-
+???
+Explain how net migration patterns lead to different age distributions.
 ---
 # Non-census data
 CMHC provides great housing-related data. It's a pain to download, so I built an pseudo-API in R.
@@ -172,9 +189,9 @@ get_vacancy_rent_data <- function(names,level){
 }
 
 vanancy_plot_options=list(
-    labs(#title="Vacancy Rate vs Change in Rent", 
-       #subtitle ="Select Cities",
-       caption="Source: CMHC Rms, code: https://github.com/mountainMath/cmhc"),
+    # labs(#title="Vacancy Rate vs Change in Rent", 
+    #    #subtitle ="Select Cities",
+    #    caption="Source: CMHC Rms, code: https://github.com/mountainMath/cmhc"),
   scale_y_continuous(labels = scales::percent),
   xlab("") ,
   scale_x_date(breaks = seq(as.Date("1990-10-01"), as.Date("2016-10-01"), by="2 years"), 
@@ -188,20 +205,22 @@ vanancy_plot_options=list(
 
 
 ```{r, fig.height=4, fig.width=10, message=FALSE, warning=FALSE, dev="svg"}
-names=c("Vancouver","Toronto","Calgary","Winnipeg")
-cmhc <- get_vacancy_rent_data(names,"CMA")
-ggplot(cmhc, aes(x = Year, y = Rate, color = Series)) +
-  geom_line() + geom_point() + facet_wrap("city", ncol=2) +
-  vanancy_plot_options
+cmhc <- get_vacancy_rent_data(c("Vancouver","Toronto","Calgary","Winnipeg"),"CMA")
+ggplot(cmhc, aes(x = Year, y = Rate, color = Series)) + vanancy_plot_options +
+  geom_line() + geom_point() + facet_wrap("city", ncol=2) 
 ```
 
+???
+CMHC has recently made finer data available. Sadly no APIs, but we can hack their data portal to speed up analysis. So we built a pseudo-API to consume it.
+
+This graph shows the primary market vacancy rate and the fixed-sample rent change on the same axis. We note the clear inverse relationship between the two, with sometimes strong responses in non rent-controlled Calgary. And yes, rents do drop when the vacancy rate is high.
 ---
 # Keeping the Census fresh
 The 2016 census data is still quite up to date. But the clock is ticking, how can we keep it fresh?
 
 CMHC building data can tell us where people go, we can use past censuses migration data to make educated guesses about demolition rates and the demographics of the new units.
 
-```{r, echo=FALSE, fig.height=4, fig.width=5, message=FALSE, warning=FALSE, dev='svg'}
+```{r, echo=FALSE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE, dev='svg'}
 
 bg_color="#c0c0c0"
 theme_opts<-list(theme(panel.grid.minor = element_blank(),
@@ -268,10 +287,12 @@ total=sum(geos$All)
 ggplot(geos) +
   geom_sf(aes(fill = categories), size = 0.05) +
   scale_fill_manual(labels=labels, values=colors, name = "# Units") +
-  ggtitle(paste0(cma, " CMA Completions May 2016 - October 2017 (",prettyNum(total,big.mark = ",")," total)")) +
+  ggtitle(paste0(cma, " CMA Completions May 2016 - Oct 2017 (",prettyNum(total,big.mark = ",")," total)")) +
   theme_opts
 ```
 
+???
+Mixing in concurrent data sources like CMHC and CANSIM can extend the useful life of census data. Data APIs designed to be easily integrated facilitate this. And APIs make it simple to update analysis when new data becomes available.
 ---
 # Rental Listings Data
 ```{r price_map, echo=FALSE, fig.height=5, fig.width=7, message=FALSE, warning=FALSE, dev='svg'}
@@ -288,7 +309,7 @@ ls <- get_listings(start_time,end_time,st_union(geo$geometry),beds=c(1),filter =
 min_listings=10
 
 median_rent <- function(v){
-  result <- ifelse(length(v)>min_listings, median(v),NA)
+  result <- ifelse(length(v)>=min_listings, median(v),NA)
   return(result)
 }
 
@@ -307,25 +328,27 @@ ggplot() +
   geom_sf(data=geo, fill="#808080", size=0.1) +
   geom_sf(data=data, aes(fill = discrete_price), size=0.1) +
   scale_fill_brewer(palette='RdYlBu', direction=-1, na.value="#808080",name="Median Price") +
-  labs(title="July - October 1 Bedroom Unfurnished Median Ask") +
+  labs(title=paste0("July - October 1 Bedroom Unfurnished Median Ask (n = ",format(nrow(ls),big.mark=","),")")) +
   theme_opts
 ```
 ---
 # Reproducibility, Transparancy, Adaptability
-
 We need to adopt a more collaborative approach to understanding housing issues.
 
-## Notebooks
-
-A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. 
-
-## APIs
-
+.pull-left[
+### Notebooks
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. In fact, this presentation is an R notebook and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/phrn.Rmd).
+]
+.pull-right[
+### APIs
 In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+]
 
+???
+This is key to building an ecosystem of people and groups that collaborate to advance understanding of housing (and other) issues. Opening up your analysis for everyone to see and pluck apart might be uncomfortable at first, but it's essential to take the discussion to the next level. It increases transparency and trust, and allows others to build on your work.
 ---
 # Parting Thought
-Diverging Narratives that need to be reconsiliated:
+Diverging Narratives that need to be reconciliated: At ecological level, it looks like things got worse. At individual levels, it looks like like they got better.
 ```{r, message=FALSE, warning=FALSE, include=FALSE}
 library(cancensus)
 library(tidyverse)
@@ -395,7 +418,7 @@ g1 <- ggplot(data,
        aes(x=factor(Year), y=Ratio)) +
   geom_bar(stat="identity",position="dodge", fill="steelblue") +
   scale_y_continuous(labels = scales::percent) +
-  labs(x="Year", title="Average Shelter cost to Median Income") +
+  labs(x="Year", title="Average Shelter cost to Average Income") +
   geom_text(aes(label=format_percent(Ratio)),vjust=-0.5, position = position_dodge(width = 1), size=text_size) +
   expand_limits(y=max(data$Ratio)*1.15) +
   facet_wrap("Region",ncol=2) +
@@ -424,5 +447,8 @@ grid.arrange(
 
 ```
 
+???
+Our discussion rarely move beyond presenting a simple quotient. We need to move beyond viewing the world through single census variables or simple percentages and dig deeper into the very complex issues we are facing.
 
+Thanks for bearing with me. These slides are online at https://mountainmath.ca/phrn.html and the R notebook that made the, including the code, is linked at GitHub.
 

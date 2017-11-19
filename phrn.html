@@ -11,7 +11,7 @@
 class: center, middle, inverse, title-slide
 
 # What can data tell us about housing in Vancouver?
-## Using data to answer our housing questions
+## Using data to inform our housing questions
 ### Jens von Bergmann
 ### 2017/11/19
 
@@ -22,13 +22,14 @@ class: center, middle, inverse, title-slide
 
 class: center, middle
 
-Vancouver housing issues are comples. We are using *data* to understand them. I want to give some examples of how I approach this, and propose a way forward toward collaborative data-driven research.
+Housing issues are complex. We increasingly use *data* to understand them. I want to give some examples of how I approach this, and propose a way forward toward collaborative data-driven research.
 
 ---
 
 # Data Sources
-There are a variety of data sources I have used to look at Vancouver housing issues:
 
+.pull-left[
+There are a variety of data sources I have used to look at Vancouver housing issues:
 * census
 * CMHC
 * CANSIM
@@ -39,11 +40,17 @@ There are a variety of data sources I have used to look at Vancouver housing iss
 * LIDAR data
 * Metro Vancouver Land Use
 * Property Transfer Tax
+]
 
+.pull-right[
 And some I have not used:
 * MLS
 * Land Title data
+* ...
+]
 
+???
+Not all of this data is freely available, but lots of it is.
 ---
 
 # So much data, so little time
@@ -55,8 +62,10 @@ I want to showcase some of these tools.
 ---
 # Interactive Web Maps
 
-Interactive maps are a great way to communicate simple greographic phenomena. If built well, they can easily be adapted to inform on a variety of issues.
+Interactive maps are a great way to communicate simple geographic phenomena. They can often be adapted to inform on a variety of issues.
 
+???
+Great for exploratory analysis
 ---
 # Property Level Data
 
@@ -69,14 +78,18 @@ Examples:
 * [Tax Density](https://mountainmath.ca/assessment_gl/map)
 * [Houses and Dirt](https://mountainmath.ca/assessment/split_map)
 
+???
+Sadly, most useful data is not publicly available. Can be accessed for research through cumbersome process and results can't be shared unless dropping detail and aggregated to high level.
 ---
-background-image: url("/images/houses_and_dirt.png")
+background-image: url("phrn_files/figure-html/houses_and_dirt.png")
 background-position: 50% 50%
 background-size: 100%
 class: center, bottom, inverse
 
 # &lt;a href="https://mountainmath.ca/assessment/split_map" target="_blank"&gt;Vancouver Houses And Dirt Demo&lt;/a&gt;
 
+???
+A visualization that separates land and improvement values and allows stepping through time and exploring the effect of missing middle housing on prices.
 ---
 
 # CensusMapper
@@ -91,6 +104,8 @@ class: center, bottom, inverse
 
 # &lt;a href="https://censusmapper.ca/maps/731" target="_blank"&gt;CensusMapper Demo&lt;/a&gt;
 
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
 ---
 
 # Maps aren't analysis
@@ -101,6 +116,8 @@ CensusMapper has APIs to facilitate deeper analysis. Open for all to use.
 
 Let's try and understand the effects of the net migration patterns by age on the age distribution.
 
+???
+While we do need better data, we don't make good use of the data we already have. What's needed most is analysis.
 ---
 
 # Age pyramids
@@ -111,17 +128,16 @@ Let's try and understand the effects of the net migration patterns by age on the
 ```r
 library(cancensus)
 library(cancensusHelpers)
-plot_data &lt;- get_age_data(
-  'CA16',list(CSD=c("5915022","5915004","5915055"))) %&gt;% 
+plot_data &lt;- get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %&gt;% 
   rename(City=`Region Name`)
 ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + 
-  geom_bar(stat = "identity") + age_pyramid_styling +
-  facet_wrap("City",nrow=1, scales = "free")
+  geom_bar(stat="identity") + age_pyramid_styling + facet_wrap("City",nrow=1, scales="free")
 ```
 
 ![](phrn_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
 
-
+???
+Explain how net migration patterns lead to different age distributions.
 ---
 # Non-census data
 CMHC provides great housing-related data. It's a pain to download, so I built an pseudo-API in R.
@@ -131,15 +147,17 @@ CMHC provides great housing-related data. It's a pain to download, so I built an
 
 
 ```r
-names=c("Vancouver","Toronto","Calgary","Winnipeg")
-cmhc &lt;- get_vacancy_rent_data(names,"CMA")
-ggplot(cmhc, aes(x = Year, y = Rate, color = Series)) +
-  geom_line() + geom_point() + facet_wrap("city", ncol=2) +
-  vanancy_plot_options
+cmhc &lt;- get_vacancy_rent_data(c("Vancouver","Toronto","Calgary","Winnipeg"),"CMA")
+ggplot(cmhc, aes(x = Year, y = Rate, color = Series)) + vanancy_plot_options +
+  geom_line() + geom_point() + facet_wrap("city", ncol=2) 
 ```
 
 ![](phrn_files/figure-html/unnamed-chunk-3-1.svg)&lt;!-- --&gt;
 
+???
+CMHC has recently made finer data available. Sadly no APIs, but we can hack their data portal to speed up analysis. So we built a pseudo-API to consume it.
+
+This graph shows the primary market vacancy rate and the fixed-sample rent change on the same axis. We note the clear inverse relationship between the two, with sometimes strong responses in non rent-controlled Calgary. And yes, rents do drop when the vacancy rate is high.
 ---
 # Keeping the Census fresh
 The 2016 census data is still quite up to date. But the clock is ticking, how can we keep it fresh?
@@ -148,32 +166,42 @@ CMHC building data can tell us where people go, we can use past censuses migrati
 
 ![](phrn_files/figure-html/unnamed-chunk-4-1.svg)&lt;!-- --&gt;
 
+???
+Mixing in concurrent data sources like CMHC and CANSIM can extend the useful life of census data. Data APIs designed to be easily integrated facilitate this. And APIs make it simple to update analysis when new data becomes available.
 ---
 # Rental Listings Data
 ![](phrn_files/figure-html/price_map-1.svg)&lt;!-- --&gt;
 ---
 # Reproducibility, Transparancy, Adaptability
-
 We need to adopt a more collaborative approach to understanding housing issues.
 
-## Notebooks
-
-A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. 
-
-## APIs
-
+.pull-left[
+### Notebooks
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. In fact, this presentation is an R notebook and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/phrn.Rmd).
+]
+.pull-right[
+### APIs
 In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+]
 
+???
+This is key to building an ecosystem of people and groups that collaborate to advance understanding of housing (and other) issues. Opening up your analysis for everyone to see and pluck apart might be uncomfortable at first, but it's essential to take the discussion to the next level. It increases transparency and trust, and allows others to build on your work.
 ---
 # Parting Thought
-Diverging Narratives that need to be reconsiliated:
+Diverging Narratives that need to be reconciliated: At ecological level, it looks like things got worse. At individual levels, it looks like like they got better.
 
 
 
 ![](phrn_files/figure-html/unnamed-chunk-6-1.svg)&lt;!-- --&gt;
+
+???
+Our discussion rarely move beyond presenting a simple quotient. We need to move beyond viewing the world through single census variables or simple percentages and dig deeper into the very complex issues we are facing.
+
+Thanks for bearing with me. These slides are online at https://mountainmath.ca/phrn.html and the R notebook that made the, including the code, is linked at GitHub.
     </textarea>
 <script src="libs/remark-latest.min.js"></script>
 <script>var slideshow = remark.create({
+"ratio": "16:9",
 "highlightStyle": "github",
 "highlightLines": true,
 "countIncrementalSlides": false
