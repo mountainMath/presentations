@@ -1,0 +1,428 @@
+---
+title: "What can data tell us about housing in Vancouver?"
+subtitle: "Using data to answer our housing questions"
+author: "Jens von Bergmann"
+date: "2017/11/19"
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+library("knitr")
+library("utils")
+options(servr.daemon = TRUE)
+```
+
+class: center, middle
+
+Vancouver housing issues are comples. We are using *data* to understand them. I want to give some examples of how I approach this, and propose a way forward toward collaborative data-driven research.
+
+---
+
+# Data Sources
+There are a variety of data sources I have used to look at Vancouver housing issues:
+
+* census
+* CMHC
+* CANSIM
+* BC Assessment
+* BC parcel fabric
+* rental listing services
+* building permits
+* LIDAR data
+* Metro Vancouver Land Use
+* Property Transfer Tax
+
+And some I have not used:
+* MLS
+* Land Title data
+
+---
+
+# So much data, so little time
+
+Analysis and communication of results take a lot of time. So I built tools that facilitate and greatly speed this up while increasing *transparency*, *reproducability* and *adaptablility*. 
+
+I want to showcase some of these tools.
+
+---
+# Interactive Web Maps
+
+Interactive maps are a great way to communicate simple greographic phenomena. If built well, they can easily be adapted to inform on a variety of issues.
+
+---
+# Property Level Data
+
+Property level data lets us explore housing issues at the individual property level. Great detail, but missing demographic variables.
+
+Examples:
+
+* [Assessment (and related) Data](https://mountainmath.ca/map/assessment)
+* [Teardown Index data story](https://mountainmath.ca/teardowns)
+* [Tax Density](https://mountainmath.ca/assessment_gl/map)
+* [Houses and Dirt](https://mountainmath.ca/assessment/split_map)
+
+---
+background-image: url("/images/houses_and_dirt.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://mountainmath.ca/assessment/split_map" target="_blank">Vancouver Houses And Dirt Demo</a>
+
+---
+
+# CensusMapper
+
+CensusMapper allows instant and flexible mapping of census data. Canada wide. Maps can be narrated, saved and shared. By anyone.
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/maps/731" target="_blank">CensusMapper Demo</a>
+
+---
+
+# Maps aren't analysis
+
+CensusMapper has APIs to facilitate deeper analysis. Open for all to use. 
+
+`cancensus` is an R package that seamlessly integrates census data into data analysis in R.
+
+Let's try and understand the effects of the net migration patterns by age on the age distribution.
+
+---
+
+# Age pyramids
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(scales)
+age_pyramid_styling <- list(
+  scale_x_discrete(breaks=c(seq(0, 100, 5),"100+")),
+  scale_y_continuous(labels = scales::comma),
+  coord_flip(),
+  scale_fill_brewer(palette = "Set1"),
+  theme_bw(),
+  labs(caption="cancensus, StatCan 2016 census"))
+```
+
+```{r canada_age, fig.height=3, fig.width=9, message=FALSE, warning=FALSE, dev='svg'}
+library(cancensus)
+library(cancensusHelpers)
+plot_data <- get_age_data(
+  'CA16',list(CSD=c("5915022","5915004","5915055"))) %>% 
+  rename(City=`Region Name`)
+ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + 
+  geom_bar(stat = "identity") + age_pyramid_styling +
+  facet_wrap("City",nrow=1, scales = "free")
+```
+
+
+---
+# Non-census data
+CMHC provides great housing-related data. It's a pain to download, so I built an pseudo-API in R.
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(cmhc)
+
+# A function to read and tidy CMHC data
+vacancy_rent_table_for <- function(geography,geography_type="CMA"){
+  region_params=cmhc_region_params(geography = geography,type=geography_type)
+  params=cmhc_timeseries_params(table_id = cmhc_table_list["Rms Vacancy Rate Time Seris"],region=region_params)
+  dat_vacancy=get_cmhc(params)
+  title_x=attr(dat_vacancy,"title")
+  dat_vacancy <- dat_vacancy %>% 
+    select("X1","Total") %>%
+    #mutate(Total=as.numeric(as.character(Total))/100) %>%
+    rename(vacancy_rate=Total, X=X1)
+  params=cmhc_timeseries_params(table_id = cmhc_table_list["Rms Rent Change Time Seris"],region=region_params)
+  dat_rent_change=get_cmhc(params)
+  title_y=attr(dat_rent_change,"title")
+  dat_rent_change <- dat_rent_change %>%
+    select("X1","Total") %>%
+    #mutate(Total=as.numeric(as.character(Total))/100) %>%
+    rename(rent_change=Total, X=X1)
+  dat=inner_join(dat_vacancy,dat_rent_change,by="X") %>% rename(Year=X)
+  attr(dat,"region")=paste0(geography," ",geography_type)
+  attr(dat,"labels")=c(title_x,title_y)
+  return(dat)
+}
+
+get_vacancy_rent_data <- function(names,level){
+  cmhc=bind_rows(lapply(names,function(x){return(vacancy_rent_table_for(x,"CMA")) %>% mutate(city=x)})) %>% 
+    gather(key = "Series", value = "Rate",vacancy_rate:rent_change) %>%
+    mutate(
+      Series = case_when(
+      .$Series == "vacancy_rate" ~ "Vacancy Rate",
+      .$Series == "rent_change" ~ "Rent Change"),
+      Year = as.Date(paste0(Year," 01"),format="%Y %B %d"),
+      Rate=Rate/100)
+  return(cmhc)  
+}
+
+vanancy_plot_options=list(
+    labs(#title="Vacancy Rate vs Change in Rent", 
+       #subtitle ="Select Cities",
+       caption="Source: CMHC Rms, code: https://github.com/mountainMath/cmhc"),
+  scale_y_continuous(labels = scales::percent),
+  xlab("") ,
+  scale_x_date(breaks = seq(as.Date("1990-10-01"), as.Date("2016-10-01"), by="2 years"), 
+    date_labels=format("%b %Y")),
+  scale_color_manual(labels = c("% Rent Change\n(fixed sample)","Vacancy Rate"), values = c("darkgreen", "steelblue"), name = ""),
+  theme_minimal(),
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+)
+
+```
+
+
+```{r, fig.height=4, fig.width=10, message=FALSE, warning=FALSE, dev="svg"}
+names=c("Vancouver","Toronto","Calgary","Winnipeg")
+cmhc <- get_vacancy_rent_data(names,"CMA")
+ggplot(cmhc, aes(x = Year, y = Rate, color = Series)) +
+  geom_line() + geom_point() + facet_wrap("city", ncol=2) +
+  vanancy_plot_options
+```
+
+---
+# Keeping the Census fresh
+The 2016 census data is still quite up to date. But the clock is ticking, how can we keep it fresh?
+
+CMHC building data can tell us where people go, we can use past censuses migration data to make educated guesses about demolition rates and the demographics of the new units.
+
+```{r, echo=FALSE, fig.height=4, fig.width=5, message=FALSE, warning=FALSE, dev='svg'}
+
+bg_color="#c0c0c0"
+theme_opts<-list(theme(panel.grid.minor = element_blank(),
+                       #panel.grid.major = element_blank(), #bug, not working
+                       panel.grid.major = element_line(colour = bg_color),
+                       panel.background = element_rect(fill = bg_color, colour = NA),
+                       plot.background = element_rect(fill=bg_color, size=1,linetype="solid"),
+                       axis.line = element_blank(),
+                       axis.text.x = element_blank(),
+                       axis.text.y = element_blank(),
+                       axis.ticks = element_blank(),
+                       axis.title.x = element_blank(),
+                       axis.title.y = element_blank()))
+
+
+library(cmhc)
+cma="Victoria"
+year=2017
+month=10
+
+census_cma=census_geography_list[[cma]]
+cma_header=substr(census_cma, nchar(census_cma)-2,nchar(census_cma))
+
+
+census_cma=census_geography_list[[cma]]
+cma_header=substr(census_cma, nchar(census_cma)-2,nchar(census_cma))
+
+#get all under construction data for Vancouver and pad CT GeoUIDs.
+
+dates <- seq(from=as.Date('2016-05-01'), to=as.Date("2017-10-01"),by='months' )
+
+
+completions <- do.call(rbind,lapply(dates,function(date){
+  month=strftime(date,format="%m")
+  year=strftime(date,format="%Y")
+  c<-get_cmhc(cmhc_snapshot_params(
+  table_id=cmhc_table_list["Scss Completions CT"],
+  geography_id = cmhc_geography_list[[cma]],
+  year = year,
+  month = month)) %>% 
+  mutate(GeoUID = paste0(cma_header,sprintf("%07.2f", X1)),
+         date=date) %>% select(-X1,-X2)
+  return(c)
+  })) %>% select(-date) %>% group_by(GeoUID) %>% summarise_all(sum)
+
+geos <- get_census(dataset = 'CA16', regions=list(CMA=census_cma),level='CT',geo_format='sf') %>%
+   inner_join(completions, by="GeoUID")
+
+breaks=c(-Inf,1,25,50,100,150,200,250,300,400,Inf)
+labels <- c(paste0("0 - ",breaks[2]))
+for(i in 2:(length(breaks)-2)){
+  labels[i] = paste(breaks[i],breaks[i+1], sep=" - ")
+}
+labels[length(breaks)-1]=paste0("Over ",breaks[length(breaks)-1])
+#colors=c("darkred",(RColorBrewer::brewer.pal(length(labels)-1,"YlGnBu")))
+labels=factor(labels, levels=labels)
+colors=setNames(c("#808080",RColorBrewer::brewer.pal(length(labels)-1,"PiYG")),labels)
+#colors=factor(as.character(colors),levels=as.character(colors))
+
+# categorize the numbers under contruction
+geos$categories <- geos$All %>% cut(breaks=breaks, labels=labels)
+total=sum(geos$All)
+
+ggplot(geos) +
+  geom_sf(aes(fill = categories), size = 0.05) +
+  scale_fill_manual(labels=labels, values=colors, name = "# Units") +
+  ggtitle(paste0(cma, " CMA Completions May 2016 - October 2017 (",prettyNum(total,big.mark = ",")," total)")) +
+  theme_opts
+```
+
+---
+# Rental Listings Data
+```{r price_map, echo=FALSE, fig.height=5, fig.width=7, message=FALSE, warning=FALSE, dev='svg'}
+library(rental)
+start_time="2017-07-01"
+end_time="2017-11-01"
+
+geo=get_census(dataset = 'CA16',regions=list(CMA="59933"),geo_format='sf',level="CT")
+
+ls <- get_listings(start_time,end_time,st_union(geo$geometry),beds=c(1),filter = 'unfurnished')
+
+#cts=get_census(dataset = 'CA16',regions=list(CMA="59933"),geo_format='sf',level="CT")
+
+min_listings=10
+
+median_rent <- function(v){
+  result <- ifelse(length(v)>min_listings, median(v),NA)
+  return(result)
+}
+
+aggregate_listings <- aggregate(geo %>% select("GeoUID"),ls,function(x){x})
+
+data <- aggregate(ls %>% select("price"),geo,median_rent)
+
+
+cutoffs=as.integer(quantile(data$price, probs=seq(0,1,0.1), na.rm=TRUE))
+labels=factor(as.character(seq(1,length(cutoffs)-1) %>% lapply(function(i){return(paste0(cutoffs[i]," - ",cutoffs[i+1]))})),order=TRUE)
+colors=setNames(RColorBrewer::brewer.pal(length(labels),"RdYlBu"),labels)
+data$discrete_price= data$price %>% cut(breaks=cutoffs, labels=labels)
+
+
+ggplot() +
+  geom_sf(data=geo, fill="#808080", size=0.1) +
+  geom_sf(data=data, aes(fill = discrete_price), size=0.1) +
+  scale_fill_brewer(palette='RdYlBu', direction=-1, na.value="#808080",name="Median Price") +
+  labs(title="July - October 1 Bedroom Unfurnished Median Ask") +
+  theme_opts
+```
+---
+# Reproducibility, Transparancy, Adaptability
+
+We need to adopt a more collaborative approach to understanding housing issues.
+
+## Notebooks
+
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. 
+
+## APIs
+
+In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+
+---
+# Parting Thought
+Diverging Narratives that need to be reconsiliated:
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(cancensus)
+library(tidyverse)
+caption="StatCan census 2006, 2011 NHS, 2016 via cancensus & CensusMapper"
+format_percent <- function(x){return(paste0(round(x*100,1),"%"))}
+format_number <- function(x){return(format(x,big.mark = ","))}
+
+affordability_graph_for <- function(regions, text_size=4) {
+vectors_2016=c("v_CA16_4892","v_CA16_4899")
+vectors_2011=c("v_CA11N_2283","v_CA11N_2290")
+vectors_2006=c("v_CA06_2049","v_CA06_2051","v_CA06_2053","v_CA06_2056")
+data_2016=get_census("CA16",level="Regions",regions=regions,vectors=vectors_2016,labels="short") %>%
+  mutate(Owner=v_CA16_4892/100, Tenant=v_CA16_4899/100, Year=2016) 
+data_2011=get_census("CA11",level="Regions",regions=regions,vectors=vectors_2011,labels="short") %>%
+  mutate(Owner=v_CA11N_2283/100, Tenant=v_CA11N_2290/100, Year=2011) 
+data_2006=get_census("CA06",level="Regions",regions=regions,vectors=vectors_2006,labels="short") %>%
+  mutate(Owner=v_CA06_2056/v_CA06_2053, Tenant=v_CA06_2051/v_CA06_2049, Year=2006)
+
+data <- do.call(rbind,list(
+  data_2016 %>% select("Region Name", "Owner", "Tenant", "Year"),
+  data_2011 %>% select("Region Name", "Owner", "Tenant", "Year"),
+  data_2006 %>% select("Region Name", "Owner", "Tenant", "Year")
+                      )) %>% mutate(Region=`Region Name`) %>% 
+         gather(key="Tenure", value="Count",c("Owner","Tenant")) %>%
+         mutate(Year=factor(Year,levels=c(2006,2011,2016),ordered=TRUE))
+
+g1 <- ggplot(data, 
+       aes(x=factor(Year), y=Count, fill=Tenure)) +
+  geom_bar(stat="identity",position="dodge") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="Year", y="Share", title="Households spending 30% or more on shelter costs") +
+  geom_text(aes(label=format_percent(Count)),vjust=-0.5, position = position_dodge(width = 1), size=text_size) +
+  expand_limits(y=max(data$Count)*1.15) +
+  facet_wrap("Region",ncol=2) +
+  theme_bw()
+return(g1)
+}        
+
+multiple_graph_for <- function(regions, text_size=4) {
+vectors_2016=c("v_CA16_4985","v_CA16_4890","v_CA16_4894","v_CA16_4897","v_CA16_4901")
+vectors_2011=c("v_CA11N_2563","v_CA11N_2281","v_CA11N_2285","v_CA11N_2288","v_CA11N_2292")
+vectors_2006=c("v_CA06_2001","v_CA06_2049","v_CA06_2050","v_CA06_2053","v_CA06_2055")
+data_2016=get_census("CA16",level="Regions",regions=regions,vectors=vectors_2016,labels="short") %>%
+  mutate(Ratio=(v_CA16_4890*v_CA16_4894+v_CA16_4897*v_CA16_4901)/(v_CA16_4890+v_CA16_4897)*12/v_CA16_4985, Year=2016) 
+data_2011=get_census("CA11",level="Regions",regions=regions,vectors=vectors_2011,labels="short") %>%
+  mutate(Ratio=(v_CA11N_2281*v_CA11N_2285+v_CA11N_2288*v_CA11N_2292)/(v_CA11N_2281+v_CA11N_2288)*12/v_CA11N_2563, Year=2011) 
+data_2006=get_census("CA06",level="Regions",regions=regions,vectors=vectors_2006,labels="short") %>%
+  mutate(Ratio=(v_CA06_2049*v_CA06_2050+v_CA06_2053*v_CA06_2055)/(v_CA06_2049+v_CA06_2053)*12/v_CA06_2001, Year=2006) 
+# vectors_2016=c("v_CA16_2397","v_CA16_4890","v_CA16_4894","v_CA16_4897","v_CA16_4901")
+# vectors_2011=c("v_CA11N_2562","v_CA11N_2281","v_CA11N_2285","v_CA11N_2288","v_CA11N_2292")
+# vectors_2006=c("v_CA06_2000","v_CA06_2049","v_CA06_2050","v_CA06_2053","v_CA06_2055")
+# data_2016=get_census("CA16",level="Regions",regions=regions,vectors=vectors_2016,labels="short") %>%
+#   mutate(Ratio=(v_CA16_4890*v_CA16_4894+v_CA16_4897*v_CA16_4901)/(v_CA16_4890+v_CA16_4897)*12/v_CA16_2397, Year=2016) 
+# data_2011=get_census("CA11",level="Regions",regions=regions,vectors=vectors_2011,labels="short") %>%
+#   mutate(Ratio=(v_CA11N_2281*v_CA11N_2285+v_CA11N_2288*v_CA11N_2292)/(v_CA11N_2281+v_CA11N_2288)*12/v_CA11N_2562, Year=2011) 
+# data_2006=get_census("CA06",level="Regions",regions=regions,vectors=vectors_2006,labels="short") %>%
+#   mutate(Ratio=(v_CA06_2049*v_CA06_2050+v_CA06_2053*v_CA06_2055)/(v_CA06_2049+v_CA06_2053)*12/v_CA06_2000, Year=2006) 
+
+data <- do.call(rbind,list(
+  data_2016 %>% select("Region Name", "Ratio", "Year"),
+  data_2011 %>% select("Region Name", "Ratio", "Year"),
+  data_2006 %>% select("Region Name", "Ratio", "Year")
+                      )) %>% mutate(Region=`Region Name`) %>% 
+         mutate(Year=factor(Year,levels=c(2006,2011,2016),ordered=TRUE))
+
+g1 <- ggplot(data, 
+       aes(x=factor(Year), y=Ratio)) +
+  geom_bar(stat="identity",position="dodge", fill="steelblue") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x="Year", title="Average Shelter cost to Median Income") +
+  geom_text(aes(label=format_percent(Ratio)),vjust=-0.5, position = position_dodge(width = 1), size=text_size) +
+  expand_limits(y=max(data$Ratio)*1.15) +
+  facet_wrap("Region",ncol=2) +
+  theme_bw()
+return(g1)
+} 
+
+library(grid)
+library(gridExtra)
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.height=4, fig.width=10, dev='svg'}
+region=list_census_regions('CA16', quiet=TRUE, use_cache = TRUE) %>%
+  filter(level=='CSD',name=='Vancouver') %>% as_census_region_list
+
+grid.arrange(
+  grobs=list(affordability_graph_for(region),multiple_graph_for(region)),
+  ncol = 2,
+  top = 'Comparing Affordability Measures',
+  bottom=caption
+  )
+
+
+
+```
+
+
+

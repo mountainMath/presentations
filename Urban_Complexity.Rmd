@@ -1,0 +1,368 @@
+---
+title: "Urban Complexity"
+subtitle: "Moving the Discussion Froward"
+author: "Jens von Bergmann"
+date: "2017/10/24"
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+library("knitr")
+library("utils")
+options(servr.daemon = TRUE)
+```
+
+class: center, middle
+
+Urban issues are complex. Increasingly we are using *data* to understand them. From that we want to derive actionable information.
+
+The typical value chain is
+
+data -> analysis -> visualization
+
+I want to talk about the tools I use in this process.
+---
+
+# Census data
+I will focus on Census data, but the underlying story applies to other data sources too.
+
+Census data forms the foundation of most other demographic data. It enters in many ways.
+
+* We can work with straight-up census data.
+
+* We can enrich census data with other datasets or geographies.
+
+* Pretty much any other demographic dataset will get benchmarked against the census.
+
+* Census data can provide important context for non-demographic data.
+
+---
+class: inverse, center, middle
+
+# CensusMapper
+
+data -> analysis -> <span style="font-size:200%">visualization</span>
+
+---
+
+# CensusMapper Architecture
+
+CensusMapper consists of two components.
+
+1. An API server that serves census data mirrored on our database
+
+--
+
+2. A lightweight javascript library that makes API calls and draws map-based visualizations.
+
+---
+# How is CensusMapper Used?
+
+* People browse CensusMapper thematic maps
+
+
+
+* People drill into regions to browse census data
+
+
+
+* People create their own maps, narrate and share them.
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/maps/731" target="_blank">CensusMapper Demo</a>
+
+---
+
+# Maps Aren't Analysis
+
+As much as I hate to admit this. Maps aren't analysis. 
+
+
+---
+class: inverse, middle, center
+
+# CensusMapper API
+
+<span style="font-size:200%">data</span> -> analysis -> visualization
+
+---
+# Why API?
+
+* CensusMapper backend is essentially an API server, optimized for serving data for map tiles
+
+* Easy tweak to serve data for download -> Census Data API
+
+* Map-based interface to select geographic regions, searcheable hierarchical list for selecting census variables
+---
+background-image: url("images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/api" target="_blank">CensusMapper API Demo</a>
+
+---
+class: inverse, middle, center
+
+# cancensus
+
+data -> <span style="font-size:200%">analysis</span> -> visualization
+
+---
+
+# Motivation
+
+* CensusMapper made StatCan census data accessible to non-experts. For mapping and browsing.
+
+* API extensions for non-mapping purposes make custom data extracts accessible to everyone.
+
+* [`cancensus`](https://github.com/mountainMath/cancensus) is an R wrapper for these APIs that makes analysis accessible to everyone.
+--
+
+####In Vancouver, our biggest need right now is lack of analysis.
+
+---
+
+# Analysis for everyone?
+
+Maybe not everyone will use this to run their own analysis. But
+
+#### API + R notebook = Fully reproducible and transparent analysis (and visualization)
+
+so anyone can reproduce analysis.
+
+---
+
+# Democratizing data, analysis and visualization
+
+Transparency and reproducibility enabled by 
+
+* API (don't need to bring your own data) and 
+
+* R notbook (just run code to reproduce andalysis and visualization).
+
+**Should become standard as base for public policy.**
+
+--
+
+Or at least as much as possible, not all data can be public. But at least methods and analysis should be transparent.
+
+---
+
+# How does it work?
+Let's work through an example.
+
+Vulnerable children is important data for schools to decide how to dedicate resources. Child poverty is one component of this.
+
+As first approximation we want to understand general child (under 18) poverty rates by school catchment area.
+
+For more detailed analysis is [on our blog](https://doodles.mountainmath.ca/blog/2017/10/15/vsb-vulnerable-students/).
+
+All necessary code is included in the slides.
+
+---
+
+# Child poverty data
+
+```{r, include=FALSE}
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(viridis)
+library(tidyr)
+library(scales)
+```
+
+Loading the census data:
+```{r, message=FALSE, warning=FALSE}
+library(cancensus)
+vsb=list(CT=c("9330069.01","9330069.02"),CSD=c("5915022","5915803"))
+vectors=c("v_CA16_25","v_CA16_2513","v_CA16_2558")
+data <- get_census(dataset='CA16', regions=vsb, vectors=vectors, 
+                   labels="short", geo_format='sf', level='DA') %>% 
+  rename(elementary_children = v_CA16_25,children = v_CA16_2513,
+         poor_children = v_CA16_2558)
+```
+
+Overview stats:
+```{r}
+data %>% as.data.frame %>% 
+  select(children, elementary_children, poor_children) %>%
+  summarize_all(sum, na.rm=TRUE) %>% kable(format="html")
+```
+
+
+---
+
+# Where are the poor children?
+
+```{r, include=FALSE}
+map_options <- list(
+  scale_fill_viridis_c(na.value="grey", option="magma", labels=percent, name="Poverty Rate"),
+  theme_void()
+)
+```
+
+
+```{r children, fig.height=4, dev='svg'}
+ggplot(data %>% mutate(rate=poor_children/children)) + 
+  geom_sf(aes(fill = rate),size=0.1) +map_options
+```
+
+
+```{r children2, eval=FALSE, fig.height=4, dev='svg', include=FALSE}
+q <- quantile(data$poverty_rate, na.rm=TRUE,
+                      probs = seq(0, 1, length.out=9))
+ggplot(data %>% mutate(rate = cut(poverty_rate, breaks=q))) + 
+  geom_sf(aes(fill = rate),size=0.1) + 
+  scale_fill_viridis_d(na.value="grey", option="magma") + theme_void()
+```
+---
+# Matching with School Catchments
+```{r, include=FALSE}
+if (!file.exists("data_cache/schools.zip")) {
+  download.file("ftp://webftp.vancouver.ca/OpenData/shape/shape_public_places.zip","schools.zip")
+  unzip("schools.zip",exdir="data_cache/schools")
+}
+data$centroid <- st_transform(st_centroid(st_transform(data$geometry,26910)),4326)
+```
+
+```{r, message=FALSE, warning=FALSE}
+schools <- read_sf("data_cache/schools/elementary_school_boundaries.shp") %>% 
+  st_transform(4326) %>% rename(school=NAME)
+data <- st_join(data %>% st_set_geometry("centroid"),schools) %>% 
+  st_set_geometry("geometry")
+
+summary <- data %>% as.data.frame %>% group_by(school) %>% 
+  select(school, children, poor_children) %>% 
+  summarise_all(sum, na.rm=TRUE) %>% 
+  mutate(rate=poor_children/children) %>% arrange(desc(rate))
+```
+Check how many cildren we weren't able to match.
+```{r}
+summary %>% filter(is.na(school)) %>% kable(format='html')
+```
+
+---
+# Visual check on match
+```{r, include=FALSE}
+check_options <- list(
+  theme_void(),
+  scale_fill_discrete(guide=FALSE)
+  )
+```
+
+```{r, dev='svg',fig.height=4.5}
+ggplot(data) + geom_sf(aes(fill = school),size=0.1) + 
+  geom_sf(data=schools, fill=NA) + check_options
+```
+
+---
+
+# Poverty Rate by School Catchment
+```{r, eval=FALSE, include=FALSE}
+ datatable(summary, options = list(pageLength = 5))
+```
+```{r, message=FALSE, warning=FALSE}
+summary %>% head(10) %>% kable(format='html')
+```
+
+
+---
+
+```{r, include=FALSE}
+opts <- list(
+    scale_y_continuous(labels=percent),
+    theme_bw(),
+    labs(x="School Catchment",y="Child Poverty Rate"),
+    theme(axis.text.y = element_text(colour="grey20",size=6,face="plain"))
+)
+```
+
+
+```{r, dev='svg',fig.height=5.8}
+ggplot(summary , aes(x=reorder(school, rate),y=rate)) + opts +
+  geom_bar(stat="identity", fill="steelblue") + coord_flip() 
+```
+---
+# Easy to make interactives
+```{r, fig.height=5, fig.width=8, message=FALSE, warning=FALSE}
+library(tmap)
+tm_shape(left_join(schools,summary,by='school'))+tmap_mode("view")+
+  tm_polygons("rate",breaks=seq(0,0.6,0.1),title="Child Poverty")
+```
+
+---
+class: inverse, center, middle
+
+# 🎃Happy Halloween 2017!🎃
+
+Time to wrap up with our Halloween-themed trivial. CensusMapper has updated Halloween maps with all the information you need.
+
+ <style>
+ .thirds{
+  width:32%;
+  margin:0;
+ }
+ .inline{
+  display:inline-block;
+ }
+ figcaption{
+  font-size:15px;
+ }
+ </style>
+
+<figure class="inline thirds">
+    <a href="https://censusmapper.ca/maps/868" target="_blank">
+        <img src="/images/tot_onslaught_2017.png" />
+    </a>
+    <figcaption>
+        <h4>Trick-or-Treat Onslaught</h4>
+    </figcaption>
+</figure>
+<figure class="inline thirds">
+    <a href="https://censusmapper.ca/maps/869" target="_blank">
+        <img src="/images/tot_density_2017.png" />
+    </a>
+    <figcaption>
+        <h4>Trick-or-Treat Density</h4>
+    </figcaption>
+</figure>
+<figure class="inline thirds">
+    <a href="https://censusmapper.ca/maps/870" target="_blank">
+        <img src="/images/tot_haunted_2017.png" />
+    </a>
+    <figcaption>
+        <h4>Haunted Houses</h4>
+    </figcaption>
+</figure>
+
+## Where in Canada are Haunted Houses most prevalent?
+
+---
+
+# Let's check on the Haunted Houses!
+
+```{r, message=FALSE, warning=FALSE}
+regions <- list_census_regions('CA16', quiet=TRUE) %>% 
+  filter(level=="CSD",pop>=100000) %>% as_census_region_list
+get_census('CA16',"Regions",regions,c("v_CA16_1")) %>%
+  mutate(haunted=(Dwellings-Households)/Dwellings) %>% 
+  arrange(desc(haunted)) %>% select("Region Name","haunted") %>% 
+  head(8) %>% kable(format="html",class="smaller-table")
+```
+
+

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>What can data tell us about housing in Vancouver?</title>
+    <meta charset="utf-8">
+    <meta name="author" content="Jens von Bergmann" />
+    <link href="libs/remark-css/example.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# What can data tell us about housing in Vancouver?
+## Using data to answer our housing questions
+### Jens von Bergmann
+### 2017/11/19
+
+---
+
+
+
+
+class: center, middle
+
+Vancouver housing issues are comples. We are using *data* to understand them. I want to give some examples of how I approach this, and propose a way forward toward collaborative data-driven research.
+
+---
+
+# Data Sources
+There are a variety of data sources I have used to look at Vancouver housing issues:
+
+* census
+* CMHC
+* CANSIM
+* BC Assessment
+* BC parcel fabric
+* rental listing services
+* building permits
+* LIDAR data
+* Metro Vancouver Land Use
+* Property Transfer Tax
+
+And some I have not used:
+* MLS
+* Land Title data
+
+---
+
+# So much data, so little time
+
+Analysis and communication of results take a lot of time. So I built tools that facilitate and greatly speed this up while increasing *transparency*, *reproducability* and *adaptablility*. 
+
+I want to showcase some of these tools.
+
+---
+# Interactive Web Maps
+
+Interactive maps are a great way to communicate simple greographic phenomena. If built well, they can easily be adapted to inform on a variety of issues.
+
+---
+# Property Level Data
+
+Property level data lets us explore housing issues at the individual property level. Great detail, but missing demographic variables.
+
+Examples:
+
+* [Assessment (and related) Data](https://mountainmath.ca/map/assessment)
+* [Teardown Index data story](https://mountainmath.ca/teardowns)
+* [Tax Density](https://mountainmath.ca/assessment_gl/map)
+* [Houses and Dirt](https://mountainmath.ca/assessment/split_map)
+
+---
+background-image: url("/images/houses_and_dirt.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://mountainmath.ca/assessment/split_map" target="_blank"&gt;Vancouver Houses And Dirt Demo&lt;/a&gt;
+
+---
+
+# CensusMapper
+
+CensusMapper allows instant and flexible mapping of census data. Canada wide. Maps can be narrated, saved and shared. By anyone.
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/maps/731" target="_blank"&gt;CensusMapper Demo&lt;/a&gt;
+
+---
+
+# Maps aren't analysis
+
+CensusMapper has APIs to facilitate deeper analysis. Open for all to use. 
+
+`cancensus` is an R package that seamlessly integrates census data into data analysis in R.
+
+Let's try and understand the effects of the net migration patterns by age on the age distribution.
+
+---
+
+# Age pyramids
+
+
+
+
+```r
+library(cancensus)
+library(cancensusHelpers)
+plot_data &lt;- get_age_data(
+  'CA16',list(CSD=c("5915022","5915004","5915055"))) %&gt;% 
+  rename(City=`Region Name`)
+ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + 
+  geom_bar(stat = "identity") + age_pyramid_styling +
+  facet_wrap("City",nrow=1, scales = "free")
+```
+
+![](phrn_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
+
+
+---
+# Non-census data
+CMHC provides great housing-related data. It's a pain to download, so I built an pseudo-API in R.
+
+
+
+
+
+```r
+names=c("Vancouver","Toronto","Calgary","Winnipeg")
+cmhc &lt;- get_vacancy_rent_data(names,"CMA")
+ggplot(cmhc, aes(x = Year, y = Rate, color = Series)) +
+  geom_line() + geom_point() + facet_wrap("city", ncol=2) +
+  vanancy_plot_options
+```
+
+![](phrn_files/figure-html/unnamed-chunk-3-1.svg)&lt;!-- --&gt;
+
+---
+# Keeping the Census fresh
+The 2016 census data is still quite up to date. But the clock is ticking, how can we keep it fresh?
+
+CMHC building data can tell us where people go, we can use past censuses migration data to make educated guesses about demolition rates and the demographics of the new units.
+
+![](phrn_files/figure-html/unnamed-chunk-4-1.svg)&lt;!-- --&gt;
+
+---
+# Rental Listings Data
+![](phrn_files/figure-html/price_map-1.svg)&lt;!-- --&gt;
+---
+# Reproducibility, Transparancy, Adaptability
+
+We need to adopt a more collaborative approach to understanding housing issues.
+
+## Notebooks
+
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. 
+
+## APIs
+
+In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+
+---
+# Parting Thought
+Diverging Narratives that need to be reconsiliated:
+
+
+
+![](phrn_files/figure-html/unnamed-chunk-6-1.svg)&lt;!-- --&gt;
+    </textarea>
+<script src="libs/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {window.dispatchEvent(new Event('resize'));});
+(function() {var d = document, s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler"); if (!r) return; s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }"; d.head.appendChild(s);})();</script>
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  tex2jax: {
+    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+  }
+});
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
