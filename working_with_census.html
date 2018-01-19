@@ -38,7 +38,7 @@ class: center, middle, inverse, title-slide
 
 # So much data, so little time
 
-Analysis and communication of results take a lot of time. So I built tools that facilitate and greatly speed this up while increasing *transparency*, *reproducability* and *adaptablility*. 
+Data analysis and communication of results take a lot of time. So I built tools that facilitate and greatly speed this up while increasing *transparency*, *reproducability* and *adaptablility*. 
 
 I want to showcase some of these tools dealing with
 
@@ -51,7 +51,9 @@ I want to showcase some of these tools dealing with
 ---
 # Property Level Data
 
-Property level data lets us explore housing issues at the individual property level. Great detail, but missing demographic variables. Also, sketchy coverage, lots of important variables not publicly accessible. Research institutions have access to more detailed and comprehensive data, but it's cumbersome to work with.
+Property level data lets us explore civic questions at the individual property level. Great detail, but missing demographic variables. Also, sketchy coverage, lots of important variables aren't publicly accessible. Research institutions have access to more detailed and comprehensive data, but it's cumbersome to work with.
+
+Because of barriers to access we are mostly stuck at doing simple descriptive analysis visualizations.
 
 Examples:
 
@@ -110,8 +112,11 @@ How does the net migration effect the age distribution in each municipality?
 
 
 ![](working_with_census_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
+
 --
+
 How to get the data to easily make these graphs?
+
 ???
 Explain how net migration patterns lead to different age distributions.
 ---
@@ -206,7 +211,7 @@ And [example](https://www.washingtonpost.com/news/monkey-cage/wp/2016/12/02/dona
 We know the relationship between these quantities at the aggregate (ecological) level, but want to conclude something about the relationship at the individual voter level. 
 ---
 # A Simple Example
-To illustrate how to do this we consider an example where we know the answer. Take the number of households spending more than 30% of income on shelter costs in each census tract in Metro Vancouver, as well as the share of Owner and Tenant households. We want to know what share of Owner and Renter households each spend more than 30% of income on shelter costs.
+Consider an example where we know the answer. Take the number of households spending more than 30% of income on shelter in each census tract in Metro Vancouver, as well as the share of Owner and Tenant households. We want to know what share of Owner and Renter households each spend more than 30% of income on shelter.
 
 
 
@@ -228,13 +233,11 @@ Ecological inference builds a distribution over the space of our quantities of i
 ![](working_with_census_files/figure-html/unnamed-chunk-11-1.svg)&lt;!-- --&gt;
 
 
-```
-## [1] "Tenants spending &gt; 30% of income on shelter: 41%, Goodman Reg: 51.5%, truth: 44.7%"
-```
+Tenants spending &gt; 30% of income on shelter: 41%, Goodman Reg: 51.5%, Actual: 43.5%
 
-```
-## [1] "Owners spending &gt; 30% of income on shelter: 26.8%, Goodman Reg: 20.4%, truth: 27.6%"
-```
+Owners spending &gt; 30% of income on shelter: 26.8%, Goodman Reg: 20.4%, Actual: 25.4%
+
+
 
 
 
@@ -308,13 +311,13 @@ What share of Toronto and Vancouver residential properties are owned by owner-oc
 
 
 
-![](working_with_census_files/figure-html/unnamed-chunk-23-1.svg)&lt;!-- --&gt;
+![](working_with_census_files/figure-html/investors-1.svg)&lt;!-- --&gt;
 
 
 ---
 class: center, middle
 
-Thanks for bearing with me. These slides are online at https://mountainmath.ca/working_with_census.html and the R notebook that made the, including the code, is linked at GitHub.
+Thanks for bearing with me. These slides are online at https://mountainmath.ca/working_with_census.html and the R notebook that generated them includes the code that pulls in the data and made the graphs and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/working_with_census.Rmd).
 
 ???
 Our discussion rarely move beyond presenting a simple quotient. We need to move beyond viewing the world through single census variables or simple percentages and dig deeper into the very complex issues we are facing.

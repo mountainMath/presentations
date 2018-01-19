@@ -53,7 +53,7 @@ options(servr.daemon = TRUE)
 
 # So much data, so little time
 
-Analysis and communication of results take a lot of time. So I built tools that facilitate and greatly speed this up while increasing *transparency*, *reproducability* and *adaptablility*. 
+Data analysis and communication of results take a lot of time. So I built tools that facilitate and greatly speed this up while increasing *transparency*, *reproducability* and *adaptablility*. 
 
 I want to showcase some of these tools dealing with
 
@@ -66,7 +66,9 @@ I want to showcase some of these tools dealing with
 ---
 # Property Level Data
 
-Property level data lets us explore housing issues at the individual property level. Great detail, but missing demographic variables. Also, sketchy coverage, lots of important variables not publicly accessible. Research institutions have access to more detailed and comprehensive data, but it's cumbersome to work with.
+Property level data lets us explore civic questions at the individual property level. Great detail, but missing demographic variables. Also, sketchy coverage, lots of important variables aren't publicly accessible. Research institutions have access to more detailed and comprehensive data, but it's cumbersome to work with.
+
+Because of barriers to access we are mostly stuck at doing simple descriptive analysis visualizations.
 
 Examples:
 
@@ -138,8 +140,11 @@ plot_data <- get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %>%
 ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
   facet_wrap("City",nrow=1, scales="free_x") + age_pyramid_styling
 ```
+
 --
+
 How to get the data to easily make these graphs?
+
 ???
 Explain how net migration patterns lead to different age distributions.
 ---
@@ -216,7 +221,7 @@ vanancy_plot_options=list(
     date_labels=format("%b %Y")),
   scale_color_manual(labels = c("% Rent Change\n(fixed sample)","Vacancy Rate"), values = c("darkgreen", "steelblue"), name = ""),
   theme_minimal(),
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 )
 
 ```
@@ -236,7 +241,7 @@ This graph shows the primary market vacancy rate and the fixed-sample rent chang
 # Keeping the Census fresh
 The 2016 census data is still quite up to date. But the clock is ticking, how can we keep it fresh? 
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE, dev="svg", fig.height=4, fig.width=7}
+```{r, echo=FALSE, message=FALSE, warning=FALSE, dev="svg", fig.height=3.5, fig.width=7}
 cma_uid="59933"
 cache_file=paste0(getOption("cache_path"),"0510056_cache")
 if (file.exists(cache_file)) {
@@ -392,7 +397,7 @@ Mixing in concurrent data sources like CMHC and CANSIM can extend the useful lif
 ---
 # Reality Check
 Census and CMHC timelines of completions don't always line up. CMHC does not track demolitions well.
-```{r, echo=FALSE, fig.height=5, fig.width=7, message=FALSE, warning=FALSE}
+```{r, echo=FALSE, fig.height=4.5, fig.width=7, message=FALSE, warning=FALSE}
 geos16 <- get_census(dataset = 'CA16', regions=list(CMA=census_cma),level='CT',geo_format='sf')
 geos16 <- common_cts(geos,geos16,baseVars)
 geos_total <- inner_join(geos %>% 
@@ -428,7 +433,7 @@ Allows us to estimate where people moved to, and who these people are
 
 # Rental Listings Data
 Another important data source to inform how our city is changing is rental data.
-```{r price_map, echo=FALSE, fig.height=5, fig.width=7, message=FALSE, warning=FALSE, dev='svg'}
+```{r price_map, echo=FALSE, fig.height=4.5, fig.width=7, message=FALSE, warning=FALSE, dev='svg'}
 library(rental)
 start_time="2017-09-01"
 end_time="2017-12-31"
@@ -486,7 +491,7 @@ And [example](https://www.washingtonpost.com/news/monkey-cage/wp/2016/12/02/dona
 We know the relationship between these quantities at the aggregate (ecological) level, but want to conclude something about the relationship at the individual voter level. 
 ---
 # A Simple Example
-To illustrate how to do this we consider an example where we know the answer. Take the number of households spending more than 30% of income on shelter costs in each census tract in Metro Vancouver, as well as the share of Owner and Tenant households. We want to know what share of Owner and Renter households each spend more than 30% of income on shelter costs.
+Consider an example where we know the answer. Take the number of households spending more than 30% of income on shelter in each census tract in Metro Vancouver, as well as the share of Owner and Tenant households. We want to know what share of Owner and Renter households each spend more than 30% of income on shelter.
 
 ```{r, fig.height=3, fig.width=6, message=FALSE, warning=FALSE, include=FALSE}
 vectors=c("v_CA16_4886", # total shelter-to-income
@@ -572,18 +577,16 @@ plot(result, "tomog")
 plot(result, "tomogE")
 ```
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, include=FALSE}
+ei_table <- tibble(Type=c("Owner Households","Tenant Households"),`Goodman Regression`=c(goodman["BetaW","Estimate"],goodman["BetaB","Estimate"]),`Ecological Inference`=c(format_percent(estimate[2]),format_percent(estimate[1])),Actual=c("25.4%","43.5%"))
 
-paste0("Tenants spending > 30% of income on shelter: ",format_percent(estimate[1]), 
-             ", Goodman Reg: ",format_percent(goodman["BetaB","Estimate"]),
-             ", truth: 44.7%"
-             )
-paste0("Owners spending > 30% of income on shelter: ",format_percent(estimate[2]),
-              ", Goodman Reg: ",format_percent(goodman["BetaW","Estimate"]),
-             ", truth: 27.6%"
-            )
-
+ei_table %>% knitr::kable()
 ```
+Tenants spending > 30% of income on shelter: `r format_percent(estimate[1])`, Goodman Reg: `r format_percent(goodman["BetaB","Estimate"])`, Actual: 43.5%
+
+Owners spending > 30% of income on shelter: `r format_percent(estimate[2])`, Goodman Reg: `r format_percent(goodman["BetaW","Estimate"])`, Actual: 25.4%
+
+
 
 ```{r, eval=FALSE, include=FALSE}
 plot_data=cbind(filtered_ei_data,betaw=result$betaw)
@@ -896,7 +899,7 @@ plot_data <- do.call(rbind,list(sfs_primary_counts %>% mutate(RES="Resident"),
 ```
 
 
-```{r, echo=FALSE, fig.height=5, fig.width=7, message=FALSE, warning=FALSE}
+```{r investors, echo=FALSE, fig.height=4.5, fig.width=7, message=FALSE, warning=FALSE}
 sfs_estimates <- sfs_primary_counts %>% filter(INT=="Estimate")
 chsp_res1_counts <- chsp_counts %>% filter(RES=="Resident") %>% mutate(
   Value=ifelse(GEO=="Vancouver",
@@ -932,7 +935,7 @@ ggplot(plot_data,aes(x=GEO,y=Value, fill=RES)) +
 ---
 class: center, middle
 
-Thanks for bearing with me. These slides are online at https://mountainmath.ca/working_with_census.html and the R notebook that made the, including the code, is linked at GitHub.
+Thanks for bearing with me. These slides are online at https://mountainmath.ca/working_with_census.html and the R notebook that generated them includes the code that pulls in the data and made the graphs and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/working_with_census.Rmd).
 
 ???
 Our discussion rarely move beyond presenting a simple quotient. We need to move beyond viewing the world through single census variables or simple percentages and dig deeper into the very complex issues we are facing.
