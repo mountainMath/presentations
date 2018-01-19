@@ -41,17 +41,21 @@ There are a variety of data sources I have used to look at Vancouver housing iss
 * LIDAR data
 * Metro Vancouver Land Use
 * Property Transfer Tax
+* health data
+* open street map
+* community created data
 ]
 
 .pull-right[
 And some I have not used:
 * MLS
 * Land Title data
+* data I could not find or don't know about
 * ...
 ]
 
 ???
-Not all of this data is freely available, but lots of it is.
+Not all of this data is freely available, but lots of it is. Many challenges integrating them, some are nation wide, others fragmented at neighbourhood level.
 ---
 
 # So much data, so little time
@@ -140,8 +144,8 @@ library(cancensus)
 library(cancensusHelpers)
 plot_data <- get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %>% 
   rename(City=`Region Name`)
-ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + 
-  geom_bar(stat="identity") + age_pyramid_styling + facet_wrap("City",nrow=1, scales="free")
+ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("City",nrow=1, scales="free") + age_pyramid_styling
 ```
 
 ???
@@ -331,6 +335,9 @@ ggplot() +
   labs(title=paste0("July - October 1 Bedroom Unfurnished Median Ask (n = ",format(nrow(ls),big.mark=","),")")) +
   theme_opts
 ```
+
+???
+Only showing data for areas with at least 10 listings.
 ---
 # Reproducibility, Transparancy, Adaptability
 We need to adopt a more collaborative approach to understanding housing issues.
@@ -438,9 +445,9 @@ region=list_census_regions('CA16', quiet=TRUE, use_cache = TRUE) %>%
 
 grid.arrange(
   grobs=list(affordability_graph_for(region),multiple_graph_for(region)),
-  ncol = 2,
-  top = 'Comparing Affordability Measures',
-  bottom=caption
+  ncol = 2
+  #top = 'Comparing Affordability Measures',
+  #bottom=""
   )
 
 
