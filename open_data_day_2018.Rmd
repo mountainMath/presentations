@@ -1,0 +1,103 @@
+---
+title: "Housing Data"
+author: "Jens von Bergmann"
+date: '2018-03-02'
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      #ratio: '16:9'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	dev="svg"
+)
+options(htmltools.dir.version = FALSE)
+library("knitr")
+library("utils")
+library(tidyverse)
+library(scales)
+library(cancensus)
+library(cancensusHelpers)
+library(CANSIM2R)
+library(cmhc)
+library(rental)
+library(sf)
+options(servr.daemon = TRUE)
+```
+
+# A quick overview on housing data 
+
+1) Census
+
+2) CMHC
+
+3) CANSIM
+
+4) BC Open Data
+
+5) CoV and Surrey Open Data (and other munis)
+
+6) Metro Vanouver Open Data
+
+6) ...?
+
+---
+# Census
+
+The census has a wealth of data. Standard release data is available from [StatCan](http://www12.statcan.gc.ca/census-recensement/2016/dp-pd/index-eng.cfm). You can also explore and download data on [CensusMapper](https://censusmapper.ca), where you can [make your own maps](https://censusmapper.ca/maps/new) or [use the API to download data](https://censusmapper.ca/api). IF you are an R user, the [**cancensus** R package](https://github.com/mountainMath/cancensus) facilitates access.
+
+There are also [custom tabulations available from StatCan](http://www12.statcan.gc.ca/census-recensement/2016/dp-pd/dt-td/index-eng.cfm) that can offer deeper insights.
+
+Some municipalities make neighbourhood level custom tabulations are available, e.g. [City of Vancouver](http://data.vancouver.ca/datacatalogue/) and [Surrey](http://data.surrey.ca/dataset?q=census).
+
+![:scale 30%](https://doodles.mountainmath.ca/posts/2018-02-08-neighbourhood-level-census-data_files/figure-html/unnamed-chunk-10-1.png)
+---
+# CMHC
+
+CMHC has a wealth of housing data. Detailed consstruction activity and rental data is available from the [Housing Market Information Portal](https://www03.cmhc-schl.gc.ca/hmiportal/en/#TableMapChart/2410/3/Vancouver). 
+
+![:scale 100%](https://doodles.mountainmath.ca/posts/2017-11-28-under-construction_files/figure-html/under_construction-1.png)
+
+---
+# CANSIM
+
+CANSIM is the high-frequency arm of StatCan that publishes higher frequency but coarser geography data. Recently in the news has been the data on [non-resident owners](http://www5.statcan.gc.ca/cansim/a26?lang=eng&id=350001).
+
+![:scale 80%](https://doodles.mountainmath.ca/posts/2018-01-11-local-vs-overseas-investors_files/figure-html/local_overseas-1.png)
+
+---
+# BC Open Data
+
+We now have the [complete parcel fabric](https://catalogue.data.gov.bc.ca/dataset/parcelmap-bc-parcel-fabric) available, that's the (mostly) exact location of every single lot in BC. This is complimented by the [BC geocoder](https://www2.gov.bc.ca/gov/content/data/geographic-data-services/location-services/geocoder). BC Open Data also makes the [property transfer tax data](https://catalogue.data.gov.bc.ca/dataset/property-transfer-tax-data-2017) available, which includes data on foreign buyers (although the data FOI'd by journalists has more detail).
+
+![:scale 80%](https://doodles.mountainmath.ca/posts/2017-11-02-updated-foreign-buyer-s-data_files/figure-html/unnamed-chunk-6-1.png)
+
+---
+# Municipal data
+
+
+The province does not make assessment data available, but some municipalities make assessment and related data available on their open data portals, for example [City of Vancouver](http://data.vancouver.ca/datacatalogue/index.htm) and [Surrey](http://data.surrey.ca), going back a couple of years and containg information on assessed land and building values, age, zoning, and property taxes. These municiaplities also make remote sensing data like orthophotos and LIDAR available (and some derived products like 3D buildings).
+
+Vancouver now has tables with development permit data starting with 2017.
+
+![:scale 60%](https://doodles.mountainmath.ca/posts/2018-02-28-extra-school-tax_files/figure-html/school_tax_map-1.png)
+---
+# Metro Vancouver
+Metro Vancouver has great [land use data](http://www.metrovancouver.org/data) that provides important context for municipal property data that does not flag the type of property.
+
+![:scale 80%](https://doodles.mountainmath.ca/images/land%20use.png)
+---
+# Bring your own
+There is lots of other housing-related data out there. Airbnb data is [available via insideairbnb](http://insideairbnb.com). Some people have rental listings data. 
+![:scale 80%](open_data_day_2018_files/airbnb.png)
