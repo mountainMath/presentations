@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>cancensus, cansim &amp; co</title>
+    <meta charset="utf-8">
+    <meta name="author" content="Jens von Bergmann" />
+    <meta name="date" content="2018-06-25" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# cancensus, cansim &amp; co
+### Jens von Bergmann
+### 2018-06-25
+
+---
+
+
+
+
+
+
+
+class: center, middle
+
+StatCan data is "open" since 2011. But it's still trying to be become accessible.
+
+How to access and work with Census, CMHC and related data?
+
+
+---
+
+Some tools to make StatCan data more accessible.
+
+#### CensusMapper
+A tool for quick and easy visualization of census data. Also functions
+as an API server for pinpointed data access.
+#### cancensus
+An R wrapper around the CensusMapper API for reproducible workflows with census data.
+#### cansim
+An R wrapper around the CANSIM NDM API for reproducible workflows with CANSIM data.
+#### cmhc
+An R pseudo-API (deep beta) that extracts CMHC data for reproducible workflows with CMCH data.
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# CensusMapper
+
+# &lt;a href="https://censusmapper.ca/maps/731" target="_blank"&gt;CensusMapper Demo&lt;/a&gt;
+
+
+---
+class: inverse, middle, center
+
+# CensusMapper API
+
+* StatCan is great for bulk census data download
+
+* For more pinpointed data we need an API. CensusMapper offers APIs for 2006, 2011, and 2016 census data, for DB, DA, CT, CSD, CMA, CD, PR, C geographies.
+
+* Map-based interface to select geographic regions, searchable hierarchical list for selecting census variables
+
+---
+
+# cancensus
+
+Cancensus is an R wrapper for the CensusMapper API. Built together with [Dmitry Shkolnik](https://twitter.com/dshkol) and [Aaron Jacobs](https://github.com/atheriel).
+
+Lives on CRAN and comes [with documentation](https://mountainmath.github.io/cancensus/index.html).
+
+Allows pinpointed access to census data, CensusMapper works as GUI to facilitate data and region selection.
+
+Motivated by [Kyle Walker's tidycensus package](https://walkerke.github.io/tidycensus/). StatCan does not have API's, so `cancensus` ties into CensusMapper APIs.
+
+---
+background-image: url("images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/api" target="_blank"&gt;CensusMapper API Demo&lt;/a&gt;
+---
+# Example
+How does the net migration effect the age distribution in each municipality?
+
+
+
+
+```r
+plot_data &lt;- get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %&gt;% 
+  rename(City=`Region Name`)
+ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("City",nrow=1, scales="free_x") + age_pyramid_styling
+```
+
+![](ubc_dsi_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
+
+???
+Explain how net migration patterns lead to different age distributions.
+---
+class: inverse, middle, center
+
+# CANSIM
+
+* StatCan just switched over to the New Dissemination Model
+
+* Has 4,797
+different dataseries, 2,468 of them ongoing and getting updated regularly.
+
+* NDM makes it easier to explore and process data programmatically. `cansim` R package makes it easy. (Again, built with together with [Dmitry Shkolnik](https://twitter.com/dshkol))
+
+* Available on [GitHub](https://github.com/mountainMath/cancensusHelpers), planning to release on CRAN in coming months.
+
+---
+# cansim example
+List all tables that changed today:
+
+
+```r
+tables &lt;- get_cansim_changed_tables("2018-06-25") %&gt;% head 
+tables$productId
+```
+
+```
+## [1] 16100044 33100036 10100136 10100139 10100142 39100003
+```
+
+```r
+get_cansim_cube_metadata(tables$productId)$cubeTitleEn
+```
+
+```
+## [1] "Tobacco, sales and inventories, monthly production"                                                                                                     
+## [2] "Daily average foreign exchange rates in Canadian dollars, Bank of Canada"                                                                               
+## [3] "Bank of Canada, assets and liabilities, Wednesdays"                                                                                                     
+## [4] "Bank of Canada, money market and other interest rates"                                                                                                  
+## [5] "Positions of members of the Canadian Payments Association and Bank of Canada operations, Bank of Canada, weekly"                                        
+## [6] "Number of residential properties, by ownership type and residency status, provinces of British Columbia and Ontario and their census metropolitan areas"
+```
+
+---
+# Look at Non-resident owners
+
+
+```r
+get_cansim_table_overview("39-10-0049")
+```
+
+```
+## Number and percentage of residential properties, by residency status, provinces of British Columbia and Ontario and their census subdivisions
+## CANSIM Table 39-10-0049
+## Start Date: 2017-06-01, End Date: 2017-06-01, Frequency: Occasional
+## 
+## Column Geography (773)
+## British Columbia, Abbotsford-Mission, census metropolitan area, Abbotsford, Mission, Kelowna, census metropolitan area, Central Okanagan, Central Okanagan J, Kelowna, Lake Country, Peachland, ...
+## 
+## Column Residency status (3)
+## Total, all residency status categories, Resident, Non-resident
+## 
+## Column Estimates (2)
+## Number, Percentage
+```
+
+---
+
+
+
+```r
+data_csd &lt;- get_cansim("39-10-0049") %&gt;% normalize_cansim_values() 
+plot_data &lt;- data_csd %&gt;% 
+  filter(Estimates=="Percentage",
+         `Residency status`=="Non-resident")
+ggplot(plot_data %&gt;% top_n(10,VALUE),
+       aes(x=reorder(GEO,VALUE),y=VALUE)) +
+  geom_bar(stat="identity",fill="brown") +
+  graph_style1
+```
+
+![](ubc_dsi_files/figure-html/unnamed-chunk-6-1.svg)&lt;!-- --&gt;
+---
+
+
+
+
+```r
+top_pop_munis &lt;- data_csd %&gt;% filter(Estimates=="Number",
+         `Residency status`=="Total, all residency status categories") %&gt;% 
+  top_n(10,VALUE) %&gt;% pull(GEO) %&gt;% unique
+
+ggplot(plot_data %&gt;% filter(GEO %in% top_pop_munis),
+       aes(x=reorder(GEO,VALUE),y=VALUE)) +
+  geom_bar(stat="identity",fill="brown") +
+  graph_style2
+```
+
+![](ubc_dsi_files/figure-html/unnamed-chunk-8-1.svg)&lt;!-- --&gt;
+---
+# Can combine with census data
+
+```r
+csds &lt;- get_census("CA16",regions=list(PR="59"),geo_format="sf",level="CSD") %&gt;%
+  st_transform(26910) %&gt;% st_intersection(
+    get_ecumene_2016() %&gt;% filter(ECUMENE=="1") %&gt;% st_transform(26910))
+```
+
+
+
+```r
+ggplot(csds %&gt;% left_join(plot_data,by="GeoUID")) + 
+  geom_sf(data = water, fill = "lightblue", colour = NA) +
+  geom_sf(data=boundaries,color="black",size=0.1) +
+  geom_sf(aes(fill=VALUE),color=NA) + map_theme
+```
+
+![](ubc_dsi_files/figure-html/unnamed-chunk-11-1.svg)&lt;!-- --&gt;
+
+---
+
+# Non-census data
+CMHC provides great housing-related data. It's a pain to download, so I built an [pseudo-API in R](https://github.com/mountainMath/cmhc).
+
+
+
+
+
+```r
+cmhc &lt;- get_vacancy_rent_data(c("Vancouver","Toronto","Calgary","Winnipeg"),"CMA")
+ggplot(cmhc, aes(x = Year, y = Rate, color = Series)) + vanancy_plot_options +
+  geom_line() + geom_point() + facet_wrap("city", ncol=2) 
+```
+
+![](ubc_dsi_files/figure-html/unnamed-chunk-13-1.svg)&lt;!-- --&gt;
+
+???
+CMHC has recently made finer data available. Sadly no APIs, but we can hack their data portal to speed up analysis. So we built a pseudo-API to consume it.
+
+This graph shows the primary market vacancy rate and the fixed-sample rent change on the same axis. We note the clear inverse relationship between the two, with sometimes strong responses in non rent-controlled Calgary. And yes, rents do drop when the vacancy rate is high.
+
+---
+
+# Processing census (and related) data
+Some related packages that play well with cancensus:
+
+* [cancensusHelpers](https://github.com/mountainMath/cancensusHelpers) -- My package that encapsulates helper functions I frequently use. In a public package so others can reproduce my workflows.
+* [dotdensity](https://github.com/mountainMath/dotdensity) -- Good for dot-density maps, but also for re-aggregating data
+* [tongfen](https://github.com/mountainMath/tongfen) -- Good for comparing census data across censuses. Census geographies change over time, making comparisons hard.
+---
+
+# Bring your own
+There is lots of other data out there. Airbnb data is [available via insideairbnb](http://insideairbnb.com). Some people have rental listings data. 
+![:scale 80%](open_data_day_2018_files/airbnb.png)
+
+---
+
+# Make your own
+If data isn't available, consider building your own database.
+![:scale 80%](https://doodles.mountainmath.ca/posts/2018-06-21-skytrain-rents_files/figure-html/one_bedroom_map-1.png)
+---
+
+# Working with (open) data
+Basic rules of thumb:
+
+* Script the data download (and cache the data) for reproducibility.
+
+--
+
+* If you use a workflow twice, refactor it into a function.
+
+--
+
+* If you use a workflow in more than one project, refactor it into a package.
+
+--
+
+* If you use a workflow in more than two projects, clean up your package and put it on GitHub.
+
+--
+
+* If others, including people you never met, are using your package package submitting issues or pull requests, put your package on CRAN.
+
+--
+
+* Use R (or jupyter) notebooks whenever possible, integrates data import, cleaning, analysis, visualization and
+interpretation into one document. Can be compiled to html or pdf.
+
+---
+# Projects
+Code for the slides is [available on GitHub](https://github.com/mountainMath/presentations), some other presentations with more code too. More worked examples can be found [on my blog](https://doodles.mountainmath.ca), with links back to the R notebooks with the code.
+
+Project ideas:
+
+* CANSIM 35-10-0007 on youth admissions to correctional services by aboriginal status was [in the news yesterday](http://www.cbc.ca/news/canada/manitoba/youth-incarcerated-indigenous-half-1.4720019), could use some more analysis by province and normalized by aboriginal youth population.
+
+* Census data has a wealth of variables, can look at individual or combination of variables, and/or at change through time. Browse variables on CensusMapper and see what piques your curiosity.
+
+* Browse cansim variables using `list_cansim_tables()`, there is a lot of interesting data.
+    </textarea>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function() {
+  var d = document, s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})();</script>
+
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  tex2jax: {
+    skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+  }
+});
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://cdn.bootcss.com/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
