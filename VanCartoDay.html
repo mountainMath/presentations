@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Reproducible workflows</title>
+    <meta charset="utf-8">
+    <meta name="author" content="Jens von Bergmann" />
+    <meta name="date" content="2019-02-15" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Reproducible workflows
+### Jens von Bergmann
+### 2019-02-15
+
+---
+
+
+
+
+
+class: center, middle
+
+Too much data, too little time ...
+
+???
+My interest is mostly in data. Maps are a way to visualize geographic differences in data.
+---
+# Why **reproducible**?
+
+Reproducible workflows, where everything from data import to the final (map) product is scripted, ensures
+
+--
+
+* transparency
+
+--
+
+* reproducibility
+
+--
+
+* adaptability
+
+--
+
+My main tools: **R**, **python**, **javascript**, and javascript visualization and mapping libraries.
+
+---
+# Does everything have to be reproducible?
+
+**No!** There are tradeoffs and there is a time and place for everything.
+
+Detailed styling, complex infographics, image post-processing all have their uses and don't fit into fully reproducible workflows.
+
+But many things do, and I want to focus on these today.
+
+---
+class: medium-code
+
+# What does reproducibility look like?
+
+```r
+regions=list(CSD=c("5915022","5915803"),CT=c("9330069.01","9330069.02"))
+census_data &lt;- get_census('CA16', regions, vectors=c("toddlers"="v_CA16_7"), geo_format='sf', level='DA')
+
+ggplot(census_data) + geom_sf(aes(fill=toddlers/`Shape Area`/247.11),size=0.1) +
+  scale_fill_viridis_c(trans="log",labels=function(x)round(x,2),name="Toddlers per acre\n(log scale)") 
+```
+
+![](VanCartoDay_files/figure-html/toddler-density-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+# Let's add some styling!
+
+
+
+```r
+ggplot(census_data) + geom_sf(aes(fill=toddlers/`Shape Area`/247.11),size=0.1) +
+  scale_fill_viridis_c(trans="log",labels=function(x)round(x,2),name="Toddlers per acre\n(log scale)") +
+* geom_sf(data = water, fill = "lightblue", colour = NA) +
+* geom_sf(data=roads %&gt;% filter(kind %in% c("highway", "major_road")),size=0.1) +
+* coord_sf(datum=NA, xlim=c(bbox$xmin,bbox$xmax), ylim=c(bbox$ymin,bbox$ymax))
+```
+
+![](VanCartoDay_files/figure-html/toddler-density-fancy-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code  short-title
+# A different way to show density
+
+```r
+dots &lt;- get_census('CA16', regions, geo_format='sf', level='DB') %&gt;%
+  proportional_re_aggregate(.,census_data,c("DA_UID"="GeoUID"),"toddlers",base="Population") %&gt;%
+  compute_dots(., categories = "toddlers",scale=5) 
+
+ggplot(dots) + theme(panel.background = element_rect(fill = 'black')) +
+  geom_sf(data=roads %&gt;% filter(kind %in% c("highway", "major_road")),size=0.1,color="grey") + 
+  geom_sf(data = water, fill = "#202040", colour = NA) +
+  geom_sf(color="#ffd0aa",size=0.1,alpha=0.5) +
+  coord_sf(datum=NA, xlim=c(bbox$xmin,bbox$xmax), ylim=c(bbox$ymin,bbox$ymax))
+```
+
+![](VanCartoDay_files/figure-html/toddler-dots-1.svg)&lt;!-- --&gt;
+
+???
+Dot-density suggest an accuracy that is not there. But they are very intuitive to read.
+
+---
+# How does reproducibility help?
+
+* Paper trail of what we have done, workflow is fully auditable.
+* No need to bring your own data, it gets pulled in on demand.
+* Easy to adapt. If we want this for Toronto, we just set the `regions` parameter to Toronto and the rest runs through.
+* If we want to do a similar analysis, we can just copy and paste parts over.
+
+We can spend our effort on doing deeper analysis and visualizations.
+
+---
+class: medium-code, short-title
+
+# Chinese languages in Vancouver
+
+
+
+```r
+languages &lt;- c(Mandarin="v_CA16_1259",Cantonese="v_CA16_1253")
+language_data &lt;- get_census('CA16', regions, level='DA', vectors=languages)
+ldots &lt;- get_census('CA16', regions, geo_format='sf', level='DB') %&gt;%
+  proportional_re_aggregate(.,language_data,c("DA_UID"="GeoUID"),names(languages),base="Population") %&gt;%
+  compute_dots(., categories = names(languages),scale=10)
+
+ggplot(ldots) + language_theme +
+  geom_sf(aes(color=Category),size=0.1,alpha=0.5,show.legend = "point") +
+  coord_sf(datum=NA, xlim=c(bbox$xmin,bbox$xmax), ylim=c(bbox$ymin,bbox$ymax))
+```
+
+![](VanCartoDay_files/figure-html/mandarin-cantonese-1.svg)&lt;!-- --&gt;
+
+???
+How about multi-category dot-density? Works great if categories segregate. But getting this right is hard.
+---
+# A look under the hood
+
+* Effective APIs for data access, provided via CensusMapper
+* Open source tools for importing and processing data, `dotdensity` package takes care of common issues with dot-density maps:
+    - statistical rounding to avoid systematic rounding bias
+    - proportional re-aggregation for more accurate dot placements
+    - randomizing order of pixels to avoid one category being drawn last (on top) and becoming visually over-represented
+
+--
+
+Each of these pieces started out as lengthy code, 
+--
+
+then condensed into functions, 
+--
+
+then separated out into packages, 
+--
+
+then open sourced, 
+--
+
+then tested, cleaned, and improved by others. 
+
+--
+
+The end product is informative maps from short (= few chances to introduce errors) code, the code is easy to audit and to build on.
+
+???
+It's hard to under-estimate the benefits of open sourcing tools. The vetting, suggestions, and improvements by others provide an essential level of validation of building blocks of the analysis.
+
+---
+
+background-image: url("/images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# How to get the data?
+
+## &lt;a href="https://censusmapper.ca/api" target="_blank"&gt;CensusMapper API Demo&lt;/a&gt;
+
+???
+Getting data is often half the work. I have spent quite a bit of time building tools to make this easier.
+
+---
+
+background-image: url("https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time_files/figure-html/vancouver_income_map-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Maps, graphs and text
+
+## [Reproducible documents](https://doodles.mountainmath.ca/blog/2018/10/28/understanding-income-distributions-across-geographies-and-time/)
+
+---
+# Interactive maps
+
+Static maps are great. But sometimes static maps aren't enough and we need interactivity.
+
+Interactive maps are tricky. Dynamic maps often require lots of compromises. Changing scale, sending large amounts of data over the network, ...
+
+CensusMapper has been my ground-zero playground for interactive maps. A good example to highlight the possibilities as well as the challenges is the [net migration map](https://censusmapper.ca/maps/731).
+
+--
+
+But often users don't actually interact with the map. How can we engage people?
+
+???
+Buttons invite people to interact.
+
+Linked widgets enrich the experience.
+
+Map story gives guidance.
+
+---
+# Teardowns
+
+Maps can be embedded in stories, with data, charts and maps tightly interwoven with the story line. For example a story we told about [teardowns in Vancouver](https://mountainmath.ca/teardowns)
+
+.pull-left[
+
+[![Teardowns](https://doodles.mountainmath.ca/images/teardowns_animated.gif)](https://mountainmath.ca/teardowns)
+
+]
+.pull-right[
+
+Reproducibility and transparency suffers because of the complexities of the workflows, it involves more than one tool and several processing steps.
+
+As long as we provide clean interfaces between each of the steps in the workflow, we can still reproduce, adapt and re-use.
+]
+---
+
+# Reproducibility is not everything, but it is important
+
+* Small upfront time investment, big payback later
+--
+
+* When we provide analysis to governments, and public policy decisions are based on this, the analysis should be reproducible and transparent.
+--
+
+* Making code public can be scary, it exposes all the flaws in plain sight. But it's rewarding when someone else comes along and builds on your code.
+--
+
+* We all use open source tools, this is one way to give back to the community.
+--
+
+* Reproducible and transparent analysis is one part of the answer to fake news. More and more newspapers publish data and code with their stories
+    - New York Times
+    - Financial Times
+    - Economist
+    - LA Times
+    - BBC
+    - ???
+
+--
+
+The maps in these slides are fully reproducible, the code for the slide deck is [available on GitHub](https://github.com/mountainMath/presentations/blob/master/VanCartoDay.Rmd).
+
+.center[Thanks for your time!]
+
+???
+I can't stress the benefits of open source analysis enough. Making the code available keeps us honest. When we submit code with analysis, it gives recipient the confidence in the analysis. They may re-run code with updated data. But analysis begets analysis. Every result poses a new question. People come back for deeper analysis.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:10",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+(function() {
+  var i, text, code, codes = document.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+})();
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

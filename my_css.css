@@ -1,0 +1,5 @@
+.red { color: red; }
+.small-code .remark-code {font-size: 12px;}
+.medium-code .remark-code {font-size: 14px;}
+.short-title h1 {margin-bottom: 0;}
+.single-line p {display:inline;padding:0;}
