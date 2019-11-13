@@ -38,13 +38,13 @@ options(servr.daemon = TRUE)
 ## Reproducible geo-spatial analysis based on census and other Canadian data
 
 --
-* **Reproducible**: can be repeated by others with minimal work (also, can be adaped and tweaked easily)
+* **Reproducible**: can be repeated by others with minimal work (also, can be adapted and tweaked easily)
 
 --
 * **geo-spatial** analysis: data has a spatial component, which requires appropriate statistical methods
 
 --
-* **census** and other **Canadian** data: Accessing and pre-processing data is a large part of data analysis, Canadian data infrastructure is still in it's infancy and requires aquisition and processing infrastructure
+* **census** and other **Canadian** data: Accessing and pre-processing data is a large part of data analysis, Canadian data infrastructure is still in it's infancy and requires acquisition and processing infrastructure
 
 ???
 These points push us outside of Desktop GIS software and toward R or Python. For this talk we will work in R
@@ -56,8 +56,8 @@ These points push us outside of Desktop GIS software and toward R or Python. For
 * [`cansim` package](https://mountainmath.github.io/cansim/) to access census data via the [StatCan NDM API](https://www.statcan.gc.ca/eng/developers/wds)
 * [`tongfen` package](https://github.com/mountainMath/tongfen) to normalize multi-year census data to a common geography
 * [`sf` package](https://github.com/r-spatial/sf) for standard spatial operations
-* [`spatialreg` package](https://github.com/r-spatial/spatialreg) for statistical spatial modeling
-* [`ei` package](https://cran.r-project.org/web/packages/ei/ei.pdf) for ecological inference modeling
+* [`spatialreg` package](https://github.com/r-spatial/spatialreg) for statistical spatial modelling
+* [`ei` package](https://cran.r-project.org/web/packages/ei/ei.pdf) for ecological inference modelling
 
 ---
 
@@ -118,7 +118,7 @@ Let's walk through an example.
 
 ### Today's toy question: **How has residential mobility changed over the past 10 years?**
 
-The census tracks how many people lived at the same residence as they did 5 years prior. We can take the 2001-2006 and  2011-2016 timeframes to see how the share of people saying in the same residence has changed. And explore geographic differences.
+The census tracks how many people lived at the same residence as they did 5 years prior. We can take the 2001-2006 and  2011-2016 time frames to see how the share of people saying in the same residence has changed. And explore geographic differences.
 
 ???
 We could expand on this to try and understand what causes differences that we may find.
@@ -180,7 +180,7 @@ ggplot(city_data,aes(x=`Region Name`,y=value,fill=name)) +
   labs(y="Share of Movers",title="Share of population moving",fill="Period") 
 ```
 ???
-Note we removed Montréal and Québec, these cities have had singificant boundary changes and require more careful attention.
+Note we removed Montréal and Québec, these cities have had significant boundary changes and require more careful attention.
 ---
 ## Geographic breakdown
 
@@ -497,7 +497,7 @@ bind_rows(#group_by(summary_base %>% mutate(Region="Metro Van"),Region) %>% summ
 
 ---
 
-# Reproducibility, Transparancy, Adaptability
+# Reproducibility, Transparency, Adaptability
 
 .pull-left[
 ### Notebooks
