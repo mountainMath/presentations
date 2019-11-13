@@ -501,7 +501,7 @@ bind_rows(#group_by(summary_base %>% mutate(Region="Metro Van"),Region) %>% summ
 
 .pull-left[
 ### Notebooks
-A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. In fact, this presentation is an R notebook and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/working_with_census.Rmd). It contains
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. In fact, this presentation is an R notebook and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/UBC_GIS_Day_2019.Rmd). It contains
 all the code to reproduce the graphs in the presentation.
 ]
 .pull-right[
@@ -566,14 +566,4 @@ ggplot(ldots) +
   coord_sf(datum=NA, xlim=c(bbox$xmin,bbox$xmax), ylim=c(bbox$ymin,bbox$ymax)) #+
   #labs(title="Mother tongue (top 5 non-official languages)",caption="MountainMath, StatCan Census 2016")
 ```
----
-## Upshot
-* Analysis is transparent and fully reproducible, from pulling in the data, performing the analysis, to displaying the results.
-* Can easily repeat for different regions, just swap out the region selection up top.
-* Mixing in PUMF data and running an ecological inference provides an overview.
-* Can iterate and go deeper, provides base to pull a targeted custom tabulation to solidify results.
-* Cartography is passable, can be refined further and made prettier if needed.
 
-And all the code is available for copy-paste for the next project.
-
-In fact, the code is embedded in these slides, what you saw is direct output from the code. You can find the markdown code for the slides on GitHub.
