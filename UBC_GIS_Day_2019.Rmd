@@ -1,0 +1,579 @@
+---
+title: "Reproducible geo-spatial analysis based on census and other Canadian data"
+author: "Jens von Bergmann"
+date: '2019-11-13'
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      ratio: '16:10'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	dev = "svg"
+)
+options(htmltools.dir.version = FALSE)
+library(tidyverse)
+library(sf)
+library(cancensus)
+library(tongfen)
+library(mountainmathHelpers)
+library(cancensusHelpers)
+options(servr.daemon = TRUE)
+```
+
+
+## Reproducible geo-spatial analysis based on census and other Canadian data
+
+--
+* **Reproducible**: can be repeated by others with minimal work (also, can be adaped and tweaked easily)
+
+--
+* **geo-spatial** analysis: data has a spatial component, which requires appropriate statistical methods
+
+--
+* **census** and other **Canadian** data: Accessing and pre-processing data is a large part of data analysis, Canadian data infrastructure is still in it's infancy and requires aquisition and processing infrastructure
+
+???
+These points push us outside of Desktop GIS software and toward R or Python. For this talk we will work in R
+---
+## Tools:
+
+* [*R* programming language](https://www.r-project.org)
+* [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+* [`cansim` package](https://mountainmath.github.io/cansim/) to access census data via the [StatCan NDM API](https://www.statcan.gc.ca/eng/developers/wds)
+* [`tongfen` package](https://github.com/mountainMath/tongfen) to normalize multi-year census data to a common geography
+* [`sf` package](https://github.com/r-spatial/sf) for standard spatial operations
+* [`spatialreg` package](https://github.com/r-spatial/spatialreg) for statistical spatial modeling
+* [`ei` package](https://cran.r-project.org/web/packages/ei/ei.pdf) for ecological inference modeling
+
+---
+
+# CensusMapper
+
+CensusMapper is my answer to the inaccessibility of census data by non-experts. 
+
+It allows instant and flexible mapping of census data. Canada wide. Maps can be narrated, saved and shared. By anyone.
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/maps/731" target="_blank">CensusMapper Demo</a>
+
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
+---
+
+# Maps aren't analysis
+
+CensusMapper has APIs to facilitate deeper analysis. Open for all to use. 
+
+[`cancensus`](https://github.com/mountainMath/cancensus) is an R package that seamlessly integrates census data into data analysis in R.
+
+Let's try and understand the effects of the net migration patterns by age on the age distribution.
+
+???
+While we do need better data, we don't make good use of the data we already have. What's needed most is analysis.
+---
+
+# Age pyramids
+How does the net migration effect the age distribution in each municipality?
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+age_pyramid_styling <- list( 
+  scale_x_discrete(breaks=c(seq(0, 100, 5),"100+")),
+  scale_y_continuous(labels = scales::comma),
+  coord_flip(),
+  scale_fill_brewer(palette = "Set1"),
+  theme_bw(),
+  labs(caption="cancensus, StatCan 2016 census"))
+```
+
+```{r canada_age, fig.height=3.5, fig.width=9, message=FALSE, warning=FALSE, dev='svg'}
+plot_data <- get_age_data('CA16',list(CSD=c("5915022","5915004","5915055")))
+ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + 
+  geom_bar(stat="identity") + age_pyramid_styling +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") 
+```
+
+---
+
+## How does this work?
+Let's walk through an example.
+
+### Today's toy question: **How has residential mobility changed over the past 10 years?**
+
+The census tracks how many people lived at the same residence as they did 5 years prior. We can take the 2001-2006 and  2011-2016 timeframes to see how the share of people saying in the same residence has changed. And explore geographic differences.
+
+???
+We could expand on this to try and understand what causes differences that we may find.
+
+---
+
+background-image: url("/images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# How to get the data?
+
+## <a href="https://censusmapper.ca/api" target="_blank">CensusMapper API Demo</a>
+
+???
+Getting data is often half the work. I have spent quite a bit of time building tools to make this easier.
+
+---
+### Data import
+```{r}
+mobility_variables <- c(non_movers_CA16="v_CA16_6722",priv_pop_CA16="v_CA16_424",
+                        non_movers_CA06="v_CA06_461",priv_pop_CA11="v_CA11F_216",
+                        non_movers_CA11="v_CA11N_1747",priv_pop_CA06="v_CA06_134",
+                        non_movers_CA01="v_CA01_391",priv_pop_CA01="v_CA01_127")
+
+top_cities <- list_census_regions("CA16") %>% 
+  filter(level=="CSD",!(name %in% c("Montréal","Québec"))) %>% 
+  top_n(10,pop) %>% as_census_region_list()
+
+van <- list(CSD=c("5915022","5915803"),
+            CT=c("9330069.00","9330069.01","9330069.02")) 
+regions <- list(CMA="59933")
+
+
+compute_mover_change <- function(data) data %>%
+  mutate_at(vars(matches("movers_|priv_pop")),list(~ifelse(.==0,NA,.))) %>%
+  mutate(`2001-2006`=1-non_movers_CA06/priv_pop_CA01,
+         `2006-2011`=1-non_movers_CA11/priv_pop_CA06,
+         `2011-2016`=1-non_movers_CA16/priv_pop_CA11) %>%
+  mutate(`Change in Movers`=`2011-2016`-`2001-2006`)
+```
+
+---
+## City level data
+```{r include=FALSE}
+bar_theme <- list(theme_light(),
+                  scale_y_continuous(labels=scales::percent),
+                  scale_fill_brewer(palette = "Dark2"),
+                  coord_flip(),
+                  labs(caption="StatCan Census 2001 through 2016",x=""))
+```
+
+```{r fig.height=4}
+city_data <- get_census("CA16",regions=top_cities,vectors=mobility_variables) %>%   
+  compute_mover_change() %>% pivot_longer(c("2001-2006","2006-2011","2011-2016"))
+ggplot(city_data,aes(x=`Region Name`,y=value,fill=name)) +
+  geom_bar(stat="identity",position="dodge") + bar_theme +
+  labs(y="Share of Movers",title="Share of population moving",fill="Period") 
+```
+???
+Note we removed Montréal and Québec, these cities have had singificant boundary changes and require more careful attention.
+---
+## Geographic breakdown
+
+```{r include=FALSE}
+asinh_breaks <- function(x) {
+  br <- function(r) {
+    lmin <- round(log10(r[1]))
+    lmax <- round(log10(r[2]))
+    lbreaks <- seq(lmin, lmax, by = 1)
+    breaks <- 10 ^ lbreaks
+  }
+  p.rng <- range(x[x > 0], na.rm = TRUE)
+  breaks <- br(p.rng)
+  if (min(x) <= 0) {breaks <- c(0, breaks)}
+  if (sum(x < 0) > 1) { #more negative values that expected from expanding scale that includes zero
+    n.rng <- -range(x[x < 0], na.rm = TRUE)
+    breaks <- c(breaks, -br(n.rng))
+  }
+  return(sort(breaks))
+}
+library(scales)
+asinh_trans <- function() {
+  trans_new("asinh",
+            transform = asinh,
+            inverse   = sinh,
+            breaks = asinh_breaks)
+}
+```
+
+```{r include=FALSE}
+bbox <- cov_bbox(FALSE)
+vector_tiles <- cov_vector_tiles()
+roads <- rmapzen::as_sf(vector_tiles$roads) %>% filter(kind != "ferry")
+water <- rmapzen::as_sf(vector_tiles$water)
+
+bbox2 <- metro_van_bbox(TRUE)
+vector_tiles2 <- metro_van_vector_tiles()
+roads2 <- rmapzen::as_sf(vector_tiles2$roads) %>% filter(kind != "ferry")
+water2 <- rmapzen::as_sf(vector_tiles2$water)
+
+map_theme <- list(
+  geom_sf(data = water, fill = "lightblue", colour = NA),
+  geom_sf(data=roads,size=0.1,color="darkgrey",fill=NA),
+  coord_sf(datum=NA,xlim=c(bbox$xmin,bbox$xmax),ylim=c(bbox$ymin,bbox$ymax))#,
+  #theme(legend.position = "bottom")
+)
+
+map_theme_1 <- c(map_theme, list(labs(fill=""),scale_fill_viridis_c(na.value="grey50",labels=scales::percent,trans="log",breaks=c(0.4,0.6))))
+map_theme_2 <- c(map_theme, list(labs(fill=""),scale_fill_distiller(palette = "PuOr", direction = 1, na.value = "grey50", trans="asinh",breaks=c(-0.1,0,0.1),labels=scales::percent)))
+
+map_theme_m_1 <- list(
+  geom_sf(data = water2, fill = "lightblue", colour = NA),
+  geom_sf(data=roads2,size=0.1,color="darkgrey",fill=NA),
+  coord_sf(datum=NA,xlim=c(bbox2$xmin,bbox2$xmax),ylim=c(bbox2$ymin,bbox2$ymax)),
+  labs(fill=""),
+  scale_fill_viridis_c(na.value="grey50",labels=scales::percent,trans="log",breaks=c(0.4,0.6))
+)
+map_theme_m_2 <- list(
+  geom_sf(data = water2, fill = "lightblue", colour = NA),
+  geom_sf(data=roads2,size=0.1,color="darkgrey",fill=NA),
+  coord_sf(datum=NA,xlim=c(bbox2$xmin,bbox2$xmax),ylim=c(bbox2$ymin,bbox2$ymax)),
+  labs(fill=""),
+  scale_fill_distiller(palette = "PuOr", direction = 1, na.value = "grey50", trans="asinh",breaks=c(-0.1,0,0.1),labels=scales::percent)
+)
+map_theme_m_3 <- list(
+  geom_sf(data = water2, fill = "lightblue", colour = NA),
+  geom_sf(data=roads2,size=0.1,color="darkgrey",fill=NA),
+  coord_sf(datum=NA,xlim=c(bbox2$xmin,bbox2$xmax),ylim=c(bbox2$ymin,bbox2$ymax)),
+  labs(fill=""),
+  scale_fill_brewer(palette = "PiYG",na.value="grey50")
+  #scale_fill_distiller(palette = "PuOr", direction = 1, na.value = "grey50", trans="asinh",breaks=c(-0.1,0,0.1),labels=scales::percent)
+)
+```
+
+Overall mobility declined everywhere 2001-2006 to 2011-2016. The 2006-2011 data is based on the NHS and likely biases low.
+Focus on Vancouver. Take census tracts as base for *neighbourhoods*. 
+
+```{r fig.height=3.5, fig.width=10}
+cov_geos <- lapply(seq(2001,2016,5),function(y)
+  get_census(paste0("CA",substr(y,3,4)),regions=van,level="CT",geo_format="sf") %>% 
+    select(GeoUID,geometry) %>% mutate(Year=y)) %>% 
+  do.call(rbind,.)
+ggplot(cov_geos) + geom_sf() + facet_wrap("Year",nrow=1) + coord_sf(datum=NA)
+```
+
+---
+## Enter TongFen
+Need a common geography for 2001 through 2016 data, and aggregate data to this common geography. This is a common obstacle.
+
+[TongFen](https://github.com/mountainMath/tongfen) automates this.
+
+--
+```{r}
+movers_data <- get_tongfen_census_ct_from_da(regions, vectors=mobility_variables, 
+                  geo_format = 'sf') %>% compute_mover_change() 
+
+movers_data %>% select(matches("TongfenID|movers_CA")) %>% 
+  st_set_geometry(NULL) %>% head(5) %>% knitr::kable("html")
+```
+
+---
+
+## Visual inspection
+
+```{r fig.height=4, fig.width=10}
+map_data <- movers_data %>% gather(key="Period", value, c("2001-2006","2011-2016"))
+ggplot(map_data) + geom_sf(aes(fill=value),size=0.25) + facet_wrap("Period") +
+  labs(title="Share of movers") + map_theme_m_1
+```
+
+---
+## Geography of change
+```{r fig.height=4.5}
+ggplot(movers_data) + geom_sf(aes(fill=`Change in Movers`),size=0.25) + 
+  labs(subtitle="Percentage point change 2001-2006 vs 2011-2016") + map_theme_m_2
+```
+
+---
+
+## City of Vancouver
+
+```{r fig.height=4, fig.width=10}
+cov_md <- movers_data %>% filter(TongfenID %in% cov_geos$GeoUID)
+map_data <- cov_md %>% gather(key="Period", value, c("2001-2006","2011-2016"))
+ggplot(map_data) + geom_sf(aes(fill=value)) + facet_wrap("Period") + map_theme_1 +
+  labs(title="Share of movers")
+```
+
+---
+## City of Vancouver change
+```{r fig.height=4.5}
+ggplot(cov_md) + geom_sf(aes(fill=`Change in Movers`)) + map_theme_2 + 
+  labs(subtitle="Percentage point change in share of movers 2001-2006 vs 2011-2016")
+```
+
+---
+## Question 
+What could explain (loss of) residential mobility?
+
+--
+
+* tenure
+--
+
+* age
+--
+
+* housing costs
+--
+
+* income
+--
+
+
+This is the point when should get a custom tabulation. Before doing that, there are two routes that can help us:
+* PUMF data (synthetic 1:40 subsample of the census, CMA level only)
+* Ecological inference (exploit geographic variation to estimate individual level effects)
+
+```{r include=FALSE}
+age_vars <- c(senior_f_1_CA01="v_CA01_39",senior_m_1_CA01="v_CA01_20",
+              senior_f_2_CA01="v_CA01_40",senior_m_2_CA01="v_CA01_21",
+              senior_f_3_CA01="v_CA01_41",senior_m_3_CA01="v_CA01_22",
+              senior_f_4_CA01="v_CA01_42",senior_m_4_CA01="v_CA01_23",
+              senior_f_5_CA01="v_CA01_43",senior_m_5_CA01="v_CA01_24",
+              young_f_1_CA01="v_CA01_29",young_m_1_CA01="v_CA01_10",
+              young_f_2_CA01="v_CA01_30",young_m_2_CA01="v_CA01_11",
+              mid_f_1_CA01="v_CA01_31",mid_m_1_CA01="v_CA01_12",
+              mid_f_2_CA01="v_CA01_32",mid_m_2_CA01="v_CA01_13",
+              senior_1_CA11="v_CA11F_62",senior_2_CA11="v_CA11F_65",
+              senior_3_CA11="v_CA11F_68",senior_4_CA11="v_CA11F_71",
+              senior_5_CA11="v_CA11F_74",
+              young_1_CA11="v_CA11F_17",young_2_CA11="v_CA11F_35",
+              mid_1_CA11="v_CA11F_38",mid_2_CA11="v_CA11F_41"
+)
+process_age_vars <- function(data) data %>% 
+  mutate(senior_share_CA01=select(.,matches("senior_.+_CA01"))%>% rowSums(.)/Population_CA01,
+         young_share_CA01=select(.,matches("young_.+_CA01"))%>% rowSums(.)/Population_CA01,
+         mid_share_CA01=select(.,matches("mid_.+_CA01"))%>% rowSums(.)/Population_CA01,
+         senior_share_CA11=select(.,matches("senior_.+_CA11"))%>% rowSums(.)/Population_CA11,
+         young_share_CA11=select(.,matches("young_.+_CA11"))%>% rowSums(.)/Population_CA11,
+         mid_share_CA11=select(.,matches("mid_.+_CA11"))%>% rowSums(.)/Population_CA11)
+```
+
+```{r echo=TRUE}
+tenur_vars <- c(owner_CA11="v_CA11N_2253",tenure_base_CA11="v_CA11N_2252",
+                owner_CA01="v_CA01_99",tenure_base_CA01="v_CA01_96")
+tenure_data <- get_tongfen_census_ct_from_da(regions=regions, vectors=tenur_vars) %>%
+  mutate(owner_share_CA11=owner_CA11/tenure_base_CA11,
+         owner_share_CA01=owner_CA01/tenure_base_CA01) %>%
+  select(matches("TongfenID|_share_|owner_"))
+all_data <- movers_data %>% left_join(tenure_data,by="TongfenID")
+```
+
+---
+## Ecological inference
+```{r eval=TRUE, include=FALSE}
+pumf_2016_path=file.path(getOption("custom_data_path"),"pumf/pumf_2016/Data","Census_2016_Individual_PUMF.sav")
+pumf_2016 <- foreign::read.spss(pumf_2016_path) %>%
+  as_tibble() %>%
+  set_names(names(.) %>% toupper) %>%
+  filter(CMA=="Vancouver") 
+
+non_movers_2016 <- pumf_2016 %>%
+  group_by(TENUR,MOB5) %>%
+  summarize(Count=sum(WEIGHT),cases=n()) %>%
+  filter(MOB5=="Non-movers")
+
+get_pumf_data <- function(year){
+  pumf_path=file.path(getOption("custom_data_path"),paste0("pumf/CA_",year,"_Individual.csv"))
+  d<-read_csv(pumf_path,col_types = cols(.default = "c")) %>%
+    set_names(names(.) %>% toupper)
+  if (year==2001) d<- d %>% set_names(names(d) %>% gsub("P$","",.))
+  d %>% filter(CMA=="933") %>%
+    mutate(WEIGHT=as.numeric(WEIGHT))
+}
+pumf_2011 <- get_pumf_data(2011)
+base_2011 <- pumf_2011 %>% group_by(TENUR) %>%
+  summarize(Count=sum(WEIGHT),cases=n())
+
+pumf_2006 <- get_pumf_data(2006)
+non_movers_2006 <- pumf_2006 %>% group_by(TENUR,MOB5) %>%
+  summarize(Count=sum(WEIGHT),cases=n()) %>%
+  filter(MOB5==1)
+pumf_2001 <- get_pumf_data(2001)
+base_2001 <- pumf_2001 %>% group_by(TENUR) %>%
+  summarize(Count=sum(WEIGHT),cases=n())
+
+pumf_data <- tibble(Owner=
+                      c(1-filter(non_movers_2016,TENUR=="Owned by a member of the household")$Count/filter(base_2011,TENUR=="1")$Count,
+                        1-filter(non_movers_2006,TENUR=="1")$Count/filter(base_2001,TENUR=="1")$Count),
+                    Renter=
+                       c(1-filter(non_movers_2016,TENUR=="Rented or Band housing")$Count/filter(base_2011,TENUR=="2")$Count,
+                        1-filter(non_movers_2006,TENUR=="2")$Count/filter(base_2001,TENUR=="2")$Count),
+                    Period=c("2011-2016","2001-2006")
+                     )
+```
+
+```{r results='hide'}
+ei_data_01_06 <- all_data %>% filter(!is.na(`2001-2006`),!is.na(owner_share_CA01))
+ei_01_06 <- ei::ei(formula = formula_01_06,
+                   data=ei_data_01_06, id="TongfenID", total="Households_CA01") 
+
+ei_data_11_16 <- all_data %>% filter(!is.na(`2011-2016`),!is.na(owner_share_CA11))
+ei_11_16 <- ei::ei(formula = formula_11_16,
+                   data=ei_data_11_16, id="TongfenID", total="Households_CA11") 
+```
+
+.pull-left[
+#### PUMF data
+```{r echo=FALSE}
+pumf_data  %>% pivot_longer(c("Owner","Renter"),names_to="Tenure") %>% 
+  pivot_wider(names_from = Period) %>% 
+  select(Tenure,`2001-2006`,`2011-2016`) %>%
+  mutate_if(is.numeric,function(d)scales::percent(d,accuracy = 0.1)) %>%
+  knitr::kable("html")
+```
+]
+.pull-right[
+#### Ecological Inference estimates
+```{r echo=FALSE}
+tibble(Tenure=c("Owner","Renter")) %>%
+  cbind(summary(ei_01_06)$`Estimates of Aggregate Quantities of Interest` %>% as_tibble() %>% select(`2001-2006`=mean,`sd_01`=sd)) %>%
+  cbind(summary(ei_11_16)$`Estimates of Aggregate Quantities of Interest` %>% as_tibble() %>% select(`2011-2016`=mean,`sd_11`=sd)) %>%
+  mutate_if(is.numeric,function(d)scales::percent(d,accuracy = 0.1)) %>%
+  knitr::kable("html") 
+```
+]
+
+
+---
+## How does Ecological Inference work?
+
+.pull-left[
+```{r echo=FALSE, fig.height=5, fig.width=5}
+plot(result_01_06, "tomog")
+```
+]
+.pull-right[
+```{r echo=FALSE, fig.height=5, fig.width=5}
+plot(result_11_16, "tomog")
+```
+]
+
+
+---
+## Mapping the results
+```{r include=FALSE}
+results_data <- all_data %>%
+  left_join(tibble(TongfenID=ei_01_06$id,owner_mobility_01_06=ei_01_06$betab,renter_mobility_01_06=ei_01_06$betaw)) %>%
+  left_join(tibble(TongfenID=ei_11_16$id,owner_mobility_11_16=ei_11_16$betab,renter_mobility_11_16=ei_11_16$betaw)) %>%
+  mutate(Owner=owner_mobility_11_16-owner_mobility_01_06,Renter=renter_mobility_11_16-renter_mobility_01_06)
+```
+
+
+```{r echo=FALSE, fig.height=4, fig.width=10}
+map_data_2 <- results_data %>% gather(key="Tenure", value="value", c("Owner","Renter")) %>%
+  mutate(value_d=cut(value,breaks=c(-0.3,-0.2,-0.1,-0.05,-0.01,0.01,0.05,0.1,0.2,0.3))) 
+ggplot(map_data_2) + geom_sf(aes(fill=value_d),size=0.25) + facet_wrap("Tenure") + map_theme_m_3 +
+  labs(title="Estimated percentage point change in share of movers 2001-2006 vs 2011-2016") 
+```
+
+```{r echo=FALSE, fig.height=4.5}
+summary_base <-  map_data_2 %>% mutate(Region=ifelse(TongfenID %in% cov_geos$GeoUID,"CoV","Rest"))
+summarize_shares <- function(data) data %>% st_set_geometry(NULL) %>%
+  summarize(`Owners 01-06`=weighted.mean(owner_mobility_01_06,owner_CA01),
+            `Owners 11-16`=weighted.mean(owner_mobility_11_16,owner_CA11,na.rm=TRUE),
+            `Renters 01-06`=weighted.mean(renter_mobility_01_06,Households_CA01-owner_CA01),
+            `Renters 11-16`=weighted.mean(renter_mobility_11_16,Households_CA11-owner_CA11,na.rm=TRUE)) 
+bind_rows(#group_by(summary_base %>% mutate(Region="Metro Van"),Region) %>% summarize_shares() ,
+          group_by(summary_base,Region) %>% summarize_shares() ) %>%
+  mutate_if(is.numeric,function(d)scales::percent(d,accuracy=0.1)) %>%
+  knitr::kable(format="html")
+```
+
+---
+
+# Reproducibility, Transparancy, Adaptability
+
+.pull-left[
+### Notebooks
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. In fact, this presentation is an R notebook and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/working_with_census.Rmd). It contains
+all the code to reproduce the graphs in the presentation.
+]
+.pull-right[
+### APIs
+In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+]
+--
+
+.center[**This greatly accelerates analysis.**]
+
+--
+
+I will leave you with a quiz questions.
+
+???
+This is key to building an ecosystem of people and groups that collaborate to advance understanding of civic issues. Opening up your analysis for everyone to see and pluck apart might be uncomfortable at first, but it's essential to take the discussion to the next level. It increases transparency and trust, and allows others to build on your work.
+---
+class: center inverse
+## What do the colours represent?
+
+
+```{r languages, echo=FALSE, fig.height=5.7, fig.width=7.8}
+library(dotdensity)
+regions=list(CSD=c("5915022","5915803"),CT=c("9330069.01","9330069.02"))
+all_languages <- search_census_vectors("Mother tongue","CA16","Total") %>%
+  child_census_vectors() %>%
+  filter(label=="Non-official languages") %>%
+  child_census_vectors(leaves_only = TRUE)
+
+all_data <- get_census("CA16",regions=regions,vectors=all_languages$vector,labels = "short") %>%
+  select(matches("v_CA16")) %>%
+  summarize_all(sum) %>%
+  pivot_longer(names(.),names_to = "vector") %>%
+  top_n(5,value) %>%
+  left_join(all_languages %>% select(vector,label),by="vector") %>%
+  mutate(label=gsub(" \\(.+\\)$","",label)) %>%
+  arrange(value)
+
+languages <- set_names(all_data$vector,all_data$label)
+
+geo_extent <- get_census("CA16",regions=regions,geo_format="sf")
+
+bright=c("#FFC400", "#03ED3A", "#8A2BE2", "#E8000B", "#003FFF", "#00D7FF")
+bright=c("#03ED3A","#FFC400", "#03ED3A", "#00D7FF", "#E8000B", "#003FFF")
+#bright = c("#f3f700","#00ffff","#0044ff","#ff4400","#03fc28")
+language_colors <- set_names(bright,c("Italian",all_data$label))
+#languages <- c("Language A"="v_CA16_1259","Language B"="v_CA16_1253")
+language_data <- get_census('CA16', regions, level='DA', vectors=languages)
+ldots <- get_census('CA16', regions, geo_format='sf', level='DB') %>%
+  proportional_re_aggregate(.,language_data,c("DA_UID"="GeoUID"),names(languages),base="Population") %>%
+  compute_dots(., categories = names(languages),scale=10) %>%
+  mutate(Category=factor(Category,levels=all_data$label))
+bbox=geo_extent %>% st_bbox()
+
+ggplot(ldots) + 
+  geom_sf(data = roads %>% filter(kind %in% c("highway", "major_road")),size=0.1,color="grey") +
+  geom_sf(data = water, fill = "#202040", colour = NA) +
+  scale_color_manual(values=language_colors,name="1 dot = 10 people",guide=FALSE) +
+  theme(panel.background = element_rect(fill = 'black'),
+        plot.background = element_rect(fill = 'black')) +
+  geom_sf(aes(color=Category),size=0.1,alpha=0.5,show.legend = "point") +
+  coord_sf(datum=NA, xlim=c(bbox$xmin,bbox$xmax), ylim=c(bbox$ymin,bbox$ymax)) #+
+  #labs(title="Mother tongue (top 5 non-official languages)",caption="MountainMath, StatCan Census 2016")
+```
+---
+## Upshot
+* Analysis is transparent and fully reproducible, from pulling in the data, performing the analysis, to displaying the results.
+* Can easily repeat for different regions, just swap out the region selection up top.
+* Mixing in PUMF data and running an ecological inference provides an overview.
+* Can iterate and go deeper, provides base to pull a targeted custom tabulation to solidify results.
+* Cartography is passable, can be refined further and made prettier if needed.
+
+And all the code is available for copy-paste for the next project.
+
+In fact, the code is embedded in these slides, what you saw is direct output from the code. You can find the markdown code for the slides on GitHub.

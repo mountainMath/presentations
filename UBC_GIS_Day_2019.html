@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Reproducible geo-spatial analysis based on census and other Canadian data</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Jens von Bergmann" />
+    <meta name="date" content="2019-11-13" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Reproducible geo-spatial analysis based on census and other Canadian data
+### Jens von Bergmann
+### 2019-11-13
+
+---
+
+
+
+
+
+
+## Reproducible geo-spatial analysis based on census and other Canadian data
+
+--
+* **Reproducible**: can be repeated by others with minimal work (also, can be adaped and tweaked easily)
+
+--
+* **geo-spatial** analysis: data has a spatial component, which requires appropriate statistical methods
+
+--
+* **census** and other **Canadian** data: Accessing and pre-processing data is a large part of data analysis, Canadian data infrastructure is still in it's infancy and requires aquisition and processing infrastructure
+
+???
+These points push us outside of Desktop GIS software and toward R or Python. For this talk we will work in R
+---
+## Tools:
+
+* [*R* programming language](https://www.r-project.org)
+* [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+* [`cansim` package](https://mountainmath.github.io/cansim/) to access census data via the [StatCan NDM API](https://www.statcan.gc.ca/eng/developers/wds)
+* [`tongfen` package](https://github.com/mountainMath/tongfen) to normalize multi-year census data to a common geography
+* [`sf` package](https://github.com/r-spatial/sf) for standard spatial operations
+* [`spatialreg` package](https://github.com/r-spatial/spatialreg) for statistical spatial modeling
+* [`ei` package](https://cran.r-project.org/web/packages/ei/ei.pdf) for ecological inference modeling
+
+---
+
+# CensusMapper
+
+CensusMapper is my answer to the inaccessibility of census data by non-experts. 
+
+It allows instant and flexible mapping of census data. Canada wide. Maps can be narrated, saved and shared. By anyone.
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/maps/731" target="_blank"&gt;CensusMapper Demo&lt;/a&gt;
+
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
+---
+
+# Maps aren't analysis
+
+CensusMapper has APIs to facilitate deeper analysis. Open for all to use. 
+
+[`cancensus`](https://github.com/mountainMath/cancensus) is an R package that seamlessly integrates census data into data analysis in R.
+
+Let's try and understand the effects of the net migration patterns by age on the age distribution.
+
+???
+While we do need better data, we don't make good use of the data we already have. What's needed most is analysis.
+---
+
+# Age pyramids
+How does the net migration effect the age distribution in each municipality?
+
+
+
+
+```r
+plot_data &lt;- get_age_data('CA16',list(CSD=c("5915022","5915004","5915055")))
+ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + 
+  geom_bar(stat="identity") + age_pyramid_styling +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") 
+```
+
+![](UBC_GIS_Day_2019_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
+
+---
+
+## How does this work?
+Let's walk through an example.
+
+### Today's toy question: **How has residential mobility changed over the past 10 years?**
+
+The census tracks how many people lived at the same residence as they did 5 years prior. We can take the 2001-2006 and  2011-2016 timeframes to see how the share of people saying in the same residence has changed. And explore geographic differences.
+
+???
+We could expand on this to try and understand what causes differences that we may find.
+
+---
+
+background-image: url("/images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# How to get the data?
+
+## &lt;a href="https://censusmapper.ca/api" target="_blank"&gt;CensusMapper API Demo&lt;/a&gt;
+
+???
+Getting data is often half the work. I have spent quite a bit of time building tools to make this easier.
+
+---
+### Data import
+
+```r
+mobility_variables &lt;- c(non_movers_CA16="v_CA16_6722",priv_pop_CA16="v_CA16_424",
+                        non_movers_CA06="v_CA06_461",priv_pop_CA11="v_CA11F_216",
+                        non_movers_CA11="v_CA11N_1747",priv_pop_CA06="v_CA06_134",
+                        non_movers_CA01="v_CA01_391",priv_pop_CA01="v_CA01_127")
+
+top_cities &lt;- list_census_regions("CA16") %&gt;% 
+  filter(level=="CSD",!(name %in% c("Montréal","Québec"))) %&gt;% 
+  top_n(10,pop) %&gt;% as_census_region_list()
+
+van &lt;- list(CSD=c("5915022","5915803"),
+            CT=c("9330069.00","9330069.01","9330069.02")) 
+regions &lt;- list(CMA="59933")
+
+
+compute_mover_change &lt;- function(data) data %&gt;%
+  mutate_at(vars(matches("movers_|priv_pop")),list(~ifelse(.==0,NA,.))) %&gt;%
+  mutate(`2001-2006`=1-non_movers_CA06/priv_pop_CA01,
+         `2006-2011`=1-non_movers_CA11/priv_pop_CA06,
+         `2011-2016`=1-non_movers_CA16/priv_pop_CA11) %&gt;%
+  mutate(`Change in Movers`=`2011-2016`-`2001-2006`)
+```
+
+---
+## City level data
+
+
+
+```r
+city_data &lt;- get_census("CA16",regions=top_cities,vectors=mobility_variables) %&gt;%   
+  compute_mover_change() %&gt;% pivot_longer(c("2001-2006","2006-2011","2011-2016"))
+ggplot(city_data,aes(x=`Region Name`,y=value,fill=name)) +
+  geom_bar(stat="identity",position="dodge") + bar_theme +
+  labs(y="Share of Movers",title="Share of population moving",fill="Period") 
+```
+
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-4-1.svg)&lt;!-- --&gt;
+???
+Note we removed Montréal and Québec, these cities have had singificant boundary changes and require more careful attention.
+---
+## Geographic breakdown
+
+
+
+
+
+Overall mobility declined everywhere 2001-2006 to 2011-2016. The 2006-2011 data is based on the NHS and likely biases low.
+Focus on Vancouver. Take census tracts as base for *neighbourhoods*. 
+
+
+```r
+cov_geos &lt;- lapply(seq(2001,2016,5),function(y)
+  get_census(paste0("CA",substr(y,3,4)),regions=van,level="CT",geo_format="sf") %&gt;% 
+    select(GeoUID,geometry) %&gt;% mutate(Year=y)) %&gt;% 
+  do.call(rbind,.)
+ggplot(cov_geos) + geom_sf() + facet_wrap("Year",nrow=1) + coord_sf(datum=NA)
+```
+
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-7-1.svg)&lt;!-- --&gt;
+
+---
+## Enter TongFen
+Need a common geography for 2001 through 2016 data, and aggregate data to this common geography. This is a common obstacle.
+
+[TongFen](https://github.com/mountainMath/tongfen) automates this.
+
+--
+
+```r
+movers_data &lt;- get_tongfen_census_ct_from_da(regions, vectors=mobility_variables, 
+                  geo_format = 'sf') %&gt;% compute_mover_change() 
+
+movers_data %&gt;% select(matches("TongfenID|movers_CA")) %&gt;% 
+  st_set_geometry(NULL) %&gt;% head(5) %&gt;% knitr::kable("html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; TongfenID &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; non_movers_CA01 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; non_movers_CA06 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; non_movers_CA11 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; non_movers_CA16 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; 9330001.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5320 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5200 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5465 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5465 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; 9330001.02 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1865 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1970 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2735 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2750 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; 9330002.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2870 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2960 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3295 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3535 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; 9330002.02 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4130 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4280 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 5215 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 4950 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; 9330003.01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1715 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1860 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2330 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1985 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+## Visual inspection
+
+
+```r
+map_data &lt;- movers_data %&gt;% gather(key="Period", value, c("2001-2006","2011-2016"))
+ggplot(map_data) + geom_sf(aes(fill=value),size=0.25) + facet_wrap("Period") +
+  labs(title="Share of movers") + map_theme_m_1
+```
+
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-9-1.svg)&lt;!-- --&gt;
+
+---
+## Geography of change
+
+```r
+ggplot(movers_data) + geom_sf(aes(fill=`Change in Movers`),size=0.25) + 
+  labs(subtitle="Percentage point change 2001-2006 vs 2011-2016") + map_theme_m_2
+```
+
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-10-1.svg)&lt;!-- --&gt;
+
+---
+
+## City of Vancouver
+
+
+```r
+cov_md &lt;- movers_data %&gt;% filter(TongfenID %in% cov_geos$GeoUID)
+map_data &lt;- cov_md %&gt;% gather(key="Period", value, c("2001-2006","2011-2016"))
+ggplot(map_data) + geom_sf(aes(fill=value)) + facet_wrap("Period") + map_theme_1 +
+  labs(title="Share of movers")
+```
+
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-11-1.svg)&lt;!-- --&gt;
+
+---
+## City of Vancouver change
+
+```r
+ggplot(cov_md) + geom_sf(aes(fill=`Change in Movers`)) + map_theme_2 + 
+  labs(subtitle="Percentage point change in share of movers 2001-2006 vs 2011-2016")
+```
+
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-12-1.svg)&lt;!-- --&gt;
+
+---
+## Question 
+What could explain (loss of) residential mobility?
+
+--
+
+* tenure
+--
+
+* age
+--
+
+* housing costs
+--
+
+* income
+--
+
+
+This is the point when should get a custom tabulation. Before doing that, there are two routes that can help us:
+* PUMF data (synthetic 1:40 subsample of the census, CMA level only)
+* Ecological inference (exploit geographic variation to estimate individual level effects)
+
+
+
+
+```r
+tenur_vars &lt;- c(owner_CA11="v_CA11N_2253",tenure_base_CA11="v_CA11N_2252",
+                owner_CA01="v_CA01_99",tenure_base_CA01="v_CA01_96")
+tenure_data &lt;- get_tongfen_census_ct_from_da(regions=regions, vectors=tenur_vars) %&gt;%
+  mutate(owner_share_CA11=owner_CA11/tenure_base_CA11,
+         owner_share_CA01=owner_CA01/tenure_base_CA01) %&gt;%
+  select(matches("TongfenID|_share_|owner_"))
+all_data &lt;- movers_data %&gt;% left_join(tenure_data,by="TongfenID")
+```
+
+---
+## Ecological inference
+
+
+
+```r
+ei_data_01_06 &lt;- all_data %&gt;% filter(!is.na(`2001-2006`),!is.na(owner_share_CA01))
+ei_01_06 &lt;- ei::ei(formula = formula_01_06,
+                   data=ei_data_01_06, id="TongfenID", total="Households_CA01") 
+
+ei_data_11_16 &lt;- all_data %&gt;% filter(!is.na(`2011-2016`),!is.na(owner_share_CA11))
+ei_11_16 &lt;- ei::ei(formula = formula_11_16,
+                   data=ei_data_11_16, id="TongfenID", total="Households_CA11") 
+```
+
+.pull-left[
+#### PUMF data
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; Tenure &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; 2001-2006 &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; 2011-2016 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Owner &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 35.8% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 34.3% &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Renter &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 72.0% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 64.9% &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]
+.pull-right[
+#### Ecological Inference estimates
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; Tenure &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; 2001-2006 &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; sd_01 &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; 2011-2016 &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; sd_11 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Owner &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 34.9% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.4% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 33.5% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.3% &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Renter &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 69.7% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.7% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 65.1% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 0.6% &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]
+
+
+---
+## How does Ecological Inference work?
+
+.pull-left[
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-19-1.svg)&lt;!-- --&gt;
+]
+.pull-right[
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-20-1.svg)&lt;!-- --&gt;
+]
+
+
+---
+## Mapping the results
+
+
+
+![](UBC_GIS_Day_2019_files/figure-html/unnamed-chunk-22-1.svg)&lt;!-- --&gt;
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; Region &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Owners 01-06 &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Owners 11-16 &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Renters 01-06 &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; Renters 11-16 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; CoV &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 32.3% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 32.4% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 67.8% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 64.5% &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; Rest &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 35.5% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 33.8% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 71.5% &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 65.5% &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+
+# Reproducibility, Transparancy, Adaptability
+
+.pull-left[
+### Notebooks
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. In fact, this presentation is an R notebook and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/working_with_census.Rmd). It contains
+all the code to reproduce the graphs in the presentation.
+]
+.pull-right[
+### APIs
+In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+]
+--
+
+.center[**This greatly accelerates analysis.**]
+
+--
+
+I will leave you with a quiz questions.
+
+???
+This is key to building an ecosystem of people and groups that collaborate to advance understanding of civic issues. Opening up your analysis for everyone to see and pluck apart might be uncomfortable at first, but it's essential to take the discussion to the next level. It increases transparency and trust, and allows others to build on your work.
+---
+class: center inverse
+## What do the colours represent?
+
+
+![](UBC_GIS_Day_2019_files/figure-html/languages-1.svg)&lt;!-- --&gt;
+---
+## Upshot
+* Analysis is transparent and fully reproducible, from pulling in the data, performing the analysis, to displaying the results.
+* Can easily repeat for different regions, just swap out the region selection up top.
+* Mixing in PUMF data and running an ecological inference provides an overview.
+* Can iterate and go deeper, provides base to pull a targeted custom tabulation to solidify results.
+* Cartography is passable, can be refined further and made prettier if needed.
+
+And all the code is available for copy-paste for the next project.
+
+In fact, the code is embedded in these slides, what you saw is direct output from the code. You can find the markdown code for the slides on GitHub.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:10",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

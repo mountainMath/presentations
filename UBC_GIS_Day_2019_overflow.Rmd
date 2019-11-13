@@ -1,0 +1,101 @@
+---
+title: "UBC_GIS_Day_2019_overflow"
+author: "Jens von Bergmann"
+date: "12/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r eval=FALSE, include=FALSE}
+tenur_vars2=c(owner_CA06="v_CA06_102",tenure_base_CA06="v_CA06_101",owner_CA16="v_CA16_4837",tenure_base_CA16="v_CA16_4836")
+d<-get_census("CA16",regions=list(CMA="59933"),vectors = c(tenur_vars,tenur_vars2)) %>% select(matches("tenure|owner"))
+
+ow<-d %>% pivot_longer(matches("owner"),names_to="Year",values_to = "Owner") %>% select(Owner,Year) %>% mutate(Year=gsub("owner_","",Year))
+bs<-d %>% pivot_longer(matches("tenure"),names_to="Year",values_to = "Base") %>% select(Base,Year) %>% mutate(Year=gsub("tenure_base_","",Year))
+
+r <- inner_join(ow,bs,by="Year") %>%
+  mutate(Renter=Base-Owner) %>%
+  select(-Base) %>%
+  pivot_longer(-Year)
+
+ggplot(r,aes(x=Year,y=value,fill=name)) +geom_bar(stat="identity",position="dodge")
+```
+
+---
+## Analysis (first run)
+```{r}
+formula_01_06 = `2001-2006` ~ owner_share_CA01
+model_01_06 <- lm(formula_01_06,data=all_data)
+summary(model_01_06)
+```
+
+```{r}
+formula_11_16 = `2011-2016` ~ owner_share_CA11
+model_11_16 <- lm(formula_11_16,data=all_data)
+summary(model_11_16)
+```
+
+---
+## Checks
+We need to check our regression assumptions. First up, normality of the residuals.
+
+```{r fig.height=3.5}
+res_data <- full_join(
+  tibble(`2001-2006`=model_01_06$residuals,c=names(model_01_06$residuals)),
+  tibble(`2011-2016`=model_11_16$residuals,c=names(model_11_16$residuals)),
+  by="c") %>% select(-c) %>% pivot_longer(names(.),names_to = "Period")
+ggpubr::ggqqplot(res_data,x="value",color="Period") + theme_light() + labs(title="Residuals")
+```
+
+???
+Some outliers, but overall looks ok.
+
+---
+## More tests
+
+We have spatial data, so we need to check for spatial autocorrelation!
+
+```{r}
+nb <- spdep::poly2nb(all_data %>% as_Spatial(), queen=TRUE)
+lw <- spdep::nb2listw(nb, style="W", zero.policy=TRUE)
+nb1 <- spdep::poly2nb(all_data %>% filter(!is.na(`2001-2006`),!is.na(owner_share_CA01)) %>% as_Spatial(), queen=TRUE)
+lw1 <- spdep::nb2listw(nb1, style="W", zero.policy=TRUE)
+spdep::moran.mc(model_01_06$residuals,lw1,zero.policy = TRUE,nsim=99999)
+nb2 <- spdep::poly2nb(all_data %>% filter(!is.na(`2011-2016`),!is.na(owner_share_CA11)) %>% as_Spatial(), queen=TRUE)
+lw2 <- spdep::nb2listw(nb2, style="W", zero.policy=TRUE)
+spdep::moran.mc(model_11_16$residuals,lw2,zero.policy = TRUE,nsim=99999)
+```
+
+This looks bad. We have significant positive spatial autocorrelation, with potential serious impacts on the model fit and certainty.
+
+---
+## Analysis (second run)
+```{r}
+model_s_01_06 <- spatialreg::errorsarlm(data=all_data, formula=formula_01_06, listw = lw, zero.policy=TRUE, tol.solve=1e-12)
+summary(model_s_01_06,Nagelkerke=TRUE)
+```
+
+```{r}
+model_s_11_16 <- spatialreg::errorsarlm(data=all_data, formula=formula_11_16, listw = lw, zero.policy=TRUE, tol.solve=1e-12)
+summary(model_s_11_16,Nagelkerke=TRUE)
+```
+```{r}
+spdep::moran.mc(model_s_01_06$residuals,lw1,zero.policy = TRUE,nsim=99999)
+spdep::moran.mc(model_s_11_16$residuals,lw2,zero.policy = TRUE,nsim=99999)
+```
+
+## EI stuff
+
+```{r}
+estimate_01_06 <- ei::eiread(result_01_06,"maggs")
+goodman_01_06 <- ei::eiread(result_01_06,"goodman")
+estimate_11_16 <- ei::eiread(result_11_16,"maggs")
+goodman_11_16 <- ei::eiread(result_11_16,"goodman")
+estimate_11_16[1]-estimate_01_06[1]
+estimate_11_16[2]-estimate_01_06[2]
+summary(result_01_06)$`Estimates of Aggregate Quantities of Interest`
+summary(result_11_16)$`Estimates of Aggregate Quantities of Interest`
+```

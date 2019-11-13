@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>BCA</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Jens von Bergmann" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# BCA
+### Jens von Bergmann
+### 28/05/2019
+
+---
+
+
+
+
+
+class: center, middle
+
+Assessment Data
+
+---
+# What data do we have to understand the housing market?
+
+* BCA property assessments
+
+--
+
+* Average/Median Sales
+
+--
+
+* HPI Home Price Index
+
+--
+
+* Other models
+
+---
+# BCA property assessments
+
+## Pros:
+- property level data, 
+- province wide, 
+- split between land and building values, 
+- comparable timelines since ~2005.
+
+## Cons:
+- Low frequency (annual)
+- Already half a year out of date when it comes out
+- Data availability is spotty. Municipalities are cleared to release assessment data, but not all have the infrastructure to release it, formats vary.
+- assessment don't necessarily reflect market value, e.g. Section 19(8)
+- quirks
+
+---
+# Descriptive analysis using BCA data
+
+* [Vancouver Assessment Map](https://mountainmath.ca/map/assessment)
+* [Vancouver Home Values Timeline](https://mountainmath.ca/map/values)
+* [Vancouver Tax Density](https://mountainmath.ca/assessment_gl/map)
+* [Vancouver houses and dirt](https://mountainmath.ca/assessment/split_map)
+
+---
+# Analysis based on BCA data
+
+Maps can be embedded in stories, with data, charts and maps tightly interwoven with the story line. For example a story we told about [teardowns in Vancouver](https://mountainmath.ca/teardowns)
+
+.pull-left[
+
+[![Teardowns](https://doodles.mountainmath.ca/images/teardowns_animated.gif)](https://mountainmath.ca/teardowns)
+
+]
+.pull-right[
+Model was build off of non-public BCA data, but trained to run off of public data. So we could tell a detailed story.
+]
+---
+# Informing policy
+BCA data can be useful to inform policy discussions. 
+
+* [Extra School Tax](https://doodles.mountainmath.ca/blog/2018/02/28/extra-school-tax/)
+* [Zoned for who?](https://doodles.mountainmath.ca/blog/2017/09/18/zoned-for-who/)
+* [Thumb twiddling](https://doodles.mountainmath.ca/blog/2016/01/24/work-vs-twiddling-thumbs/)
+
+---
+# BCA Open Data
+BCA data is generally not open. Introduces lots of friction, leads to information asymmetries.
+
+* Even basic data like property assessment values aren't openly available province wide. Some municipalities make it available, but public would greatly benefit from province-wide open data of assessment values.
+* Public discussion often focuses on SFH, simply because it's hard to say anything useful about condos. Even if assessment values are available, we need to know number of bedrooms and/or square footage to be useful.
+* Big pocket interests have access to detailed (and up-to-date) sales and roll data. Municipalities do not, and the information asymmetry is not in the public interest.
+
+Maybe BCA funding model can be changed from cost-recovery to provincial funding. This would allow to free up the data for everyone's benefit. Real estate is a huge topic in Vancouver, better data (and transparency) can only help.
+
+---
+
+# Median/average sale price
+
+Pros:
+- Simple number to show high-level changes in home prices
+
+Cons:
+- Vulnerable to changes in market decomposition
+- Can't tell how different segments of the market move
+
+---
+
+# HPI
+
+Pros:
+- Simple number to show high-level changes in home prices
+
+Cons:
+- Can't tell how different segments of the market move
+- Equations are over-specified, there aren't enough sales per month and subarea to fit a robust model
+- Requires manual adjustments and time smoothing to get a useful number, 
+- Lags the market (because of time smoothing), making it hard to use for point-in-time policy analysis
+
+---
+# Other models
+Different entities develop valuation models for their own purposes. Models often include a wide variety of data sources, possibly including  BCA data.
+
+BCA model needs to be transparent, others don't have that requirement and can use other methods.
+
+Example of a model not using any BCA data [to create a home price explorer](https://mountainmath.ca/hpe.html)
+
+--
+This is more an example of deploying an ML model to a browser than a useful tool, but useful to highlight what other models may do.
+
+---
+# Quiz #1
+
+Seattle has a 0.75 percentage point higher property tax rate than the City of Vancouver. Assume that split will remain constant over time, and take interest rate of 3.75%.
+
+Compared to a Seattle homeowner, a Vancouver homeowner for a similarly assessed property pays significantly lower property taxes.
+
+What is the net present value of the property tax spread on a $1M home?
+
+--
+.center[
+## $200,000
+]
+
+---
+# Quiz #2
+
+An owner of a single story "mom and pop" store in the City of Vancouver re-develops the property into a three-storey mixed use, with commercial space on the ground floor and two floors of residential space above.
+
+How will this effect the overall property taxes the City collects for that property?
+
+--
+.center[
+## [Overall property taxes collected will decrease!](https://doodles.mountainmath.ca/blog/2016/03/28/on-mixed-use/)
+]
+
+---
+class: center, middle
+# Thank you for your time
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "4:3",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
