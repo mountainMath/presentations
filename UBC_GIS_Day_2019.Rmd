@@ -267,7 +267,7 @@ ggplot(cov_geos) + geom_sf() + facet_wrap("Year",nrow=1) + coord_sf(datum=NA)
 ```
 
 ---
-## Enter TongFen
+## Enter TongFen (通分)
 Need a common geography for 2001 through 2016 data, and aggregate data to this common geography. This is a common obstacle.
 
 [TongFen](https://github.com/mountainMath/tongfen) automates this.
@@ -323,14 +323,8 @@ What could explain (loss of) residential mobility?
 --
 
 * tenure
---
-
 * age
---
-
 * housing costs
---
-
 * income
 --
 
@@ -477,7 +471,9 @@ results_data <- all_data %>%
 
 ```{r echo=FALSE, fig.height=4, fig.width=10}
 map_data_2 <- results_data %>% gather(key="Tenure", value="value", c("Owner","Renter")) %>%
-  mutate(value_d=cut(value,breaks=c(-0.3,-0.2,-0.1,-0.05,-0.01,0.01,0.05,0.1,0.2,0.3))) 
+  mutate(value_d=cut(value,breaks=c(-0.3,-0.2,-0.1,-0.05,-0.01,0.01,0.05,0.1,0.2,0.3),
+                     labels=c("-30% to -20%","-20% to -10%","-10% to -5%","-5% to -1%","-1% to 1%",
+                              "1% to 5%","5% to 10%","10% to 20%","20% to 40%"))) 
 ggplot(map_data_2) + geom_sf(aes(fill=value_d),size=0.25) + facet_wrap("Tenure") + map_theme_m_3 +
   labs(title="Estimated percentage point change in share of movers 2001-2006 vs 2011-2016") 
 ```
