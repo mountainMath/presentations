@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Reproducible and adaptable workflows using StatCan data in R</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Jens von Bergmann" />
+    <meta name="date" content="2020-01-14" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Reproducible and adaptable workflows using StatCan data in R
+## CABE Webinar
+### Jens von Bergmann
+### 2020-01-14
+
+---
+
+
+
+
+
+
+## Reproducible and adaptable workflows using StatCan data in R
+
+--
+* **Reproducible**: can be repeated by others with minimal work, (also auditable)
+
+--
+* **Adaptable**: can be easily tweaked to accomplish related tasks
+
+--
+* **StatCan data**: for this talk this means regular StatCan tables (former CANSIM) and census data (we won't look at other StatCan data like PUMF)
+
+--
+* **R**: The [*R* programming language](https://www.r-project.org). Ideally using the [RStudio IDE](https://rstudio.com). We will be working with [RMarkdown](https://bookdown.org/yihui/rmarkdown/notebook.html) documents, and need the following packages:
+  - [`cansim` package](https://mountainmath.github.io/cansim/) to access census data via the [StatCan NDM API](https://www.statcan.gc.ca/eng/developers/wds)
+  - [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+  - additionally, we will be working in the [tidyverse](https://www.tidyverse.org), an *opinionated collection of R packages* for intuitive general-purpose data manipulations and visualization capabilities.
+
+---
+## Agenda
+
+We will explore how to
+* access StatCan census and regular tables data
+* explore the datasets and perform basic data manipulations
+* do basic descriptive analysis and visualization
+
+We **won't** discuss how to
+* do deeper data analysis
+* work with census data across several census years
+* do fancy visualization or interactive live widgets
+
+---
+## Getting set up
+For those wishing to follow along live-coding, open a new RMarkdown document.
+
+.pull-left[
+![](images/open_rmarkdown.png)
+]
+.pull-right[
+![](images/open_rmarkdown2.png)
+]
+
+---
+.pull-left[
+
+
+### RMarkdown
+RMarkdown allows mixing of code and text. Analysis, visualization and report are all one and the same document. 
+
+
+```r
+library(tidyverse)
+data(mtcars)
+ggplot(mtcars,aes(x=mpg)) + 
+  geom_histogram(binwidth=4)
+```
+
+![](cabe_files/figure-html/unnamed-chunk-1-1.svg)&lt;!-- --&gt;
+
+]
+.pull-right[
+![](images/open_rmarkdown3.png)
+
+RMarkdown documents can be compiled to **HTML**, **PDF** or **Word**.
+
+The output of code blocks gets inserted into the document. We can show or hide the actual code.
+
+]
+---
+## Required packages (and API key)
+
+Time to get started in earnest.
+
+
+```r
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages(c("cansim","cancensus"))
+library(cansim)
+library(cancensus)
+```
+
+A slight complication, the `cancensus` package needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), but for today everyone who does not have one already is welcome to use a temporary API key:
+
+
+```r
+options(cancensus.api_key='CensusMapper_a82c59c0bf38e8779320cac642297b2b')
+```
+
+This API key will expire later today, for future use replace it with your own and put this line into your `.Rprofile` file, that way it's available in every R session and you won't expose your API key when sharing code.
+
+---
+## First example: Motor vehicle sales
+To start off we grab data on motor vehicle sales from table 20-10-0001 and inspect the available variables.
+
+
+```r
+mv_sales &lt;- get_cansim("20-10-0001") %&gt;%
+  normalize_cansim_values(factors=TRUE)
+
+mv_sales %&gt;% select_if(is.factor) %&gt;% sapply(levels)
+```
+
+```
+## $`Vehicle type`
+## [1] "Total, new motor vehicles" "Passenger cars"            "Trucks"                   
+## 
+## $`Origin of manufacture`
+## [1] "Total, country of manufacture" "North America"                 "Total, overseas"              
+## [4] "Japan"                         "Other countries"              
+## 
+## $Sales
+## [1] "Units"   "Dollars"
+## 
+## $`Seasonal adjustment`
+## [1] "Unadjusted"          "Seasonally adjusted"
+```
+
+---
+## Motor vehicle sales (Notes)
+It's always good to check the notes so there are no unexpected hiccups.
+
+```r
+mv_notes &lt;- get_cansim_table_notes("20-10-0001")
+knitr::kable(mv_notes)
+```
+
+
+
+Note ID   Note                                                                                                                                
+--------  ------------------------------------------------------------------------------------------------------------------------------------
+1         Prior to 1953, data for Canadian and United States manufactured vehicles and overseas manufactured vehicles are not segregated.     
+2         Includes Yukon, Northwest Territories and Nunavut.                                                                                  
+3         Trucks include minivans, sport-utility vehicles, light and heavy trucks, vans and buses.                                            
+4         Includes Japan and other countries.                                                                                                 
+5         Seasonally adjusted data for the New Motor Vehicle Sales survey are available for the period between January 1991 to February 2012. 
+
+
+--
+
+We take note of the definition for **Trucks** and that **seasonally adjusted** data has been discontinued.
+
+---
+## Motor vehicle sales
+
+```r
+plot_data &lt;- mv_sales %&gt;% 
+  filter(GEO=="Canada",
+         `Vehicle type`!="Total, new motor vehicles",
+         `Origin of manufacture`=="Total, country of manufacture",
+         Sales=="Units",
+         `Seasonal adjustment`=="Unadjusted")
+
+ggplot(plot_data,aes(x=Date,y=VALUE,color=`Vehicle type`)) +
+  geom_line() 
+```
+
+![](cabe_files/figure-html/unnamed-chunk-6-1.svg)&lt;!-- --&gt;
+
+---
+## Motor vehicle sales (nicer graph)
+
+```r
+g&lt;- plot_data %&gt;% filter(Date&gt;=as.Date("1990-01-01")) %&gt;% 
+  ggplot(aes(x=Date,y=VALUE,color=`Vehicle type`)) +
+  theme_light() +
+  geom_line(alpha=0.2) + 
+  geom_smooth(span=0.1) + 
+  scale_y_continuous(labels=function(d)scales::comma(d,scale=1/1000,suffix="k")) +
+  labs(title="Canadian new motor vehicle sales",x=NULL,y="Sales per month",
+       caption="StatCan Table 20-10-0001")
+g
+```
+
+![](cabe_files/figure-html/unnamed-chunk-7-1.svg)&lt;!-- --&gt;
+
+
+---
+class: medium-code
+## Motor vehicle sales (annotated graph, final version)
+
+```r
+library(ggrepel)   # (for nicer labels)
+g + geom_text_repel(data=~filter(.,Date==as.Date("1990-08-01"),`Vehicle type`=="Passenger cars"),
+                   label="Passenger cars",show.legend = FALSE,hjust=0,nudge_y = 30000) +
+  geom_text_repel(data=~filter(.,Date==as.Date("2018-10-01"),`Vehicle type`=="Trucks"),
+                   label="Trucks, SUVs, Vans, Buses",show.legend = FALSE,
+                  hjust=1,nudge_x = -2000,nudge_y=10000) +
+  scale_color_manual(values=c("Passenger cars"="steelblue","Trucks"="brown"),guide=FALSE)
+```
+
+![](cabe_files/figure-html/unnamed-chunk-8-1.svg)&lt;!-- --&gt;
+
+---
+
+## Cigarette sales
+.pull-left[
+Sometimes we are just interested in one specific variable. It can be easier to pull in the StatCan vector.
+
+Vector discovery can be cumbersome, downloaded table data has it. The web view has it too.
+
+We can go to the web view of table right from the R console using the following command.
+
+
+```r
+view_cansim_webpage("16-10-0044")
+```
+
+Selecting the **Add/Remove data** option allows us to filter the data down to what we want and enable the display of StatCan vectors.
+]
+
+
+.pull-right[
+![](images/cigarette_sales.png)
+]
+---
+class: medium-code
+## Cigarette sales
+
+```r
+get_cansim_vector("v28536414","1800-01-01") %&gt;% 
+  normalize_cansim_values() %&gt;%
+  ggplot(aes(x=Date,y=VALUE)) +
+  geom_line() + 
+  geom_smooth(span=0.25,se=FALSE) +
+  labs(title="Canadian cigarette sales",x=NULL,y="Monthly sales",caption="StatCan vector v28536414")
+```
+
+![](cabe_files/figure-html/unnamed-chunk-10-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Housing consumption share of GDP
+Sometimes we need more data processing to get to quantities we are interested in. One frequent pattern is that we want to look at percent shares of a total.
+
+
+```r
+gdp_data &lt;- get_cansim("36-10-0402") %&gt;% 
+  normalize_cansim_values() %&gt;%
+  filter(Value=="Chained (2012) dollars") %&gt;%
+  select(Date,GEO,naics=`North American Industry Classification System (NAICS)`,VALUE) %&gt;%
+  left_join(filter(.,grepl("T001",naics)) %&gt;% select(Date,GEO,Total=VALUE)) 
+
+gdp_data %&gt;% filter(grepl("5311",naics)) %&gt;% pull(naics) %&gt;% unique
+```
+
+```
+## [1] "Lessors of real estate [5311]"    "Owner-occupied dwellings [5311A]"
+```
+
+Here we cut down to Chained (2012) dollars and joined the **Total** GDP as another column, and we check that NAICS sub-codes starting with **5311** correspond to housing consumption.
+
+--
+
+
+```r
+housing_consumption &lt;- gdp_data %&gt;% 
+  filter(grepl("5311",naics)) %&gt;%
+  group_by(Date,GEO) %&gt;%
+  summarize(Share=sum(VALUE)/first(Total)) %&gt;%
+  mutate(highlight=GEO %in% c("British Columbia","Alberta","Ontario","Quebec"))
+```
+
+We compute the combined share of those two categories for each Date and Geography.
+
+---
+class: medium-code
+## Housing consumption share of GDP
+
+```r
+ggplot(housing_consumption,aes(x=Date,y=Share,group=GEO)) +
+  geom_line(data=~filter(.,!highlight),color="grey") + 
+  geom_line(data=~filter(.,highlight),aes(color=GEO)) +
+  theme_light() + scale_y_continuous(labels=scales::percent) +
+  labs(title="Housing consumption as share of GDP",caption="StatCan Table 36-10-0402",fill=NULL,x=NULL)
+```
+
+![](cabe_files/figure-html/unnamed-chunk-13-1.svg)&lt;!-- --&gt;
+
+
+
+---
+class: medium-code
+## Data discovery
+Data discovery is still a major issue. Right now we have two ways
+
+* Google
+* cumbersome overview table from Open Data Canada
+
+
+```r
+search_cansim_tables("job vacancy") %&gt;% select(cansim_table_number,title) %&gt;% knitr::kable()
+```
+
+
+
+cansim_table_number   title                                                                                                                                                   
+--------------------  --------------------------------------------------------------------------------------------------------------------------------------------------------
+14-10-0225            Job vacancies, labour demand and job vacancy rate, annual, inactive                                                                                     
+14-10-0224            Job vacancies, labour demand and job vacancy rate, three-month moving average, unadjusted for seasonality, inactive                                     
+14-10-0326            Job vacancies, payroll employees, job vacancy rate, and average offered hourly wage by industry sector, quarterly, unadjusted for seasonality           
+14-10-0325            Job vacancies, payroll employees, job vacancy rate, and average offered hourly wage by provinces and territories, quarterly, unadjusted for seasonality 
+
+
+--
+
+StatCan is working on better data discovery, hopefully things will get easier in the future.
+
+
+---
+class: medium-code
+## Combining StatCan tables
+To understand growth of jobs we combined LFS employment data with JVWS data on job vacancies.
+
+```r
+library(lubridate)
+lfs_data &lt;- get_cansim("14-10-0293") %&gt;% normalize_cansim_values() %&gt;%
+  filter(`Labour force characteristics`=="Employment", Statistics=="Estimate")
+jv_data &lt;- get_cansim("14-10-0325") %&gt;% normalize_cansim_values() %&gt;%
+  filter(Statistics=="Job vacancies") %&gt;% mutate(Date=Date %m+% months(1))
+```
+
+Job vacancies are only available quarterly, so we combine 3 months moving average LFS data with job vacancy data time-shifted to the middle of the quarter.
+
+--
+
+```r
+jobs_data &lt;- inner_join(lfs_data %&gt;% select(Date,GeoUID,GEO,Employment=VALUE),
+                        jv_data %&gt;% select(Date,GeoUID,`Job vacancies`=VALUE),
+                        by=c("Date","GeoUID")) %&gt;%
+  filter(!is.na(`Job vacancies`)) %&gt;%
+  pivot_longer(c("Job vacancies","Employment")) %&gt;%
+  mutate(name=factor(name,levels=c("Job vacancies","Employment"))) %&gt;%
+  filter(grepl("Canada|Lower Mainland|Toronto|Calgary",GEO))
+```
+
+Start dates for job vacancy data varies by geography, so it's safer to join and pivot the data than to just bind the rows.
+
+---
+class: medium-code
+## Combining StatCan tables
+
+```r
+ggplot(jobs_data,aes(x=Date,y=value,fill=name)) +
+  geom_bar(stat="identity") +
+  facet_wrap("GEO",scales="free_y") +
+  scale_y_continuous(labels=scales::comma) +
+  labs(title="Jobs by economic region",fill=NULL,x=NULL,y=NULL,
+       caption="StatCan Tables 14-10-0293,14-10-0325")
+```
+
+![](cabe_files/figure-html/unnamed-chunk-17-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Income by age groups
+
+```r
+income_age_groups &lt;- c("16 to 24 years", "25 to 34 years" , "35 to 44 years" , 
+                       "45 to 54 years" , "55 to 64 years", "65 years and over")
+income_data &lt;- get_cansim("11-10-0239") %&gt;%
+  normalize_cansim_values(factors = TRUE) %&gt;%
+  filter(GEO=="Canada",
+         Sex=="Both sexes",
+         Statistics=="Median income (excluding zeros)",
+         `Income source`=="Total income",
+         `Age group` %in% income_age_groups) 
+```
+Sometimes we want to do several similar plots, it can be useful to define a custom theme.
+
+```r
+line_theme &lt;- list(
+  geom_line(),
+  geom_point(data=~filter(.,Date==max(Date))),
+  scale_color_brewer(palette="Dark2",guide=FALSE),
+  theme_light(),
+  expand_limits(x=as.Date("2025-01-01")),
+  ggrepel::geom_text_repel(data=~filter(.,Date==max(Date)),aes(label=`Age group`),hjust=-0.1,
+                           color='black',direction="y",size=4),
+  scale_y_continuous(labels=scales::dollar)
+)
+```
+
+---
+class: medium-code
+## Income by age groups
+
+```r
+ggplot(income_data,aes(x=Date,y=VALUE,color=`Age group`)) +
+  line_theme +
+  labs(title="Median income by age group in Canada", x=NULL, y="2017 constant dollars",
+       caption="StatCan Table 11-10-0239")
+```
+
+![](cabe_files/figure-html/unnamed-chunk-20-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Wealth
+
+
+```r
+cpi &lt;- get_cansim_vector("v41693271","1990-01-01") %&gt;% normalize_cansim_values() %&gt;%
+  filter(Date&lt;="2016-12-31") %&gt;% mutate(CPI=VALUE/last(VALUE,order_by=Date))
+wealth_age_groups &lt;- c("Under 35 years","35 to 44 years" , "45 to 54 years",   "55 to 64 years" , "65 years and older")
+wealth_data &lt;- get_cansim("11-10-0016") %&gt;%
+  normalize_cansim_values(factors=TRUE) %&gt;%
+  filter(GEO=="Canada",
+         `Assets and debts`=="Net Worth (assets less debts)",
+         Statistics=="Median value for those holding asset or debt",
+         `Economic family type`!="Economic families and persons not in an economic family",
+         `Age group` %in% wealth_age_groups) %&gt;%
+  left_join(cpi %&gt;% select(Date,CPI),by="Date") %&gt;%
+  mutate(Value=VALUE/CPI) %&gt;%
+  select(GEO,Date,`Age group`,`Confidence intervals`,`Economic family type`,Value) %&gt;%
+  pivot_wider(names_from="Confidence intervals",values_from="Value")
+```
+
+Wealth data needs a bit more processing. 
+* We need to manually adjust the wealth data for inflation. 
+* We want to also pay attention to the confidence intervals.
+
+---
+class: medium-code
+## Wealth
+
+```r
+ggplot(wealth_data,aes(x=Date,y=Estimate,color=`Age group`)) +
+  line_theme +
+  geom_ribbon(aes(ymin=`Lower bound of a 95% confidence interval`,
+                  ymax=`Upper bound of a 95% confidence interval`),fill="grey",alpha=0.3,size=0) +
+  facet_wrap("`Economic family type`") +
+  labs(title="Median net worth by age group in Canada",x=NULL,y="Constant 2016 dollars",
+       caption="StatCan Table 11-10-0239")
+```
+
+![](cabe_files/figure-html/unnamed-chunk-22-1.svg)&lt;!-- --&gt;
+
+---
+## Census data
+Census data offers much richer variables and spatial resolution, but at coarse time intervals.
+
+Richer data comes at a price: Data discovery and acquisition is more complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a quick tour of CensusMapper...
+
+---
+class: medium-code
+## Census data
+
+```r
+poverty_data &lt;- get_census("CA16",regions=list(CSD="3520005"),vectors=c(lico_at="v_CA16_2573"),
+                           geo_format="sf",level="CT") 
+
+ggplot(poverty_data,aes(fill=lico_at/100)) +
+  geom_sf(size=NA) + coord_sf(datum = NA) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Toronto share of children in poverty",fill=NULL,caption="StatCan Census 2016")
+```
+
+![](cabe_files/figure-html/unnamed-chunk-23-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Mixing census data with StatCan Tables
+
+```r
+geo_data &lt;- get_census("CA16",regions=list(CMA="59933"),geo_format = 'sf',level="CSD")
+chsp_data &lt;- get_cansim("46-10-0049") %&gt;% normalize_cansim_values(factors = TRUE) %&gt;%
+  filter(GeoUID %in% geo_data$GeoUID) %&gt;%
+  filter(`Owner-occupied property type` == "Condominium apartment",
+         `Owner characteristics at the property level`=="None of the owners receive pension income",
+         Estimates=="Median ratio of assessment value to total income") 
+
+ggplot(left_join(geo_data,chsp_data),aes(fill=VALUE)) +
+  geom_sf() + scale_fill_viridis_c(option = "magma",trans="log") + coord_sf(datum=NA) +
+  labs(title="Median ratio of assessment value to total income\nfor non-pensioner condo owners",
+       caption="StatCan table 46-10-0049",fill=NULL)
+```
+
+![](cabe_files/figure-html/unnamed-chunk-24-1.svg)&lt;!-- --&gt;
+
+
+
+---
+## Recap
+
+* APIs make it easy to pull in data as needed. 
+* scripting data processing in R (or python) make analysis transparent, autitable and adaptable.
+* simply re-run the scripts when new data becomes available.
+* to collaborate just share the code, don't need to worry about sharing data and keeping data up-to-date.
+* iterative process: can easily add data analysis and visualization.
+* packages like **cansim** provides stability against API changes, they abstract the changes under the hood and deliver (more) stable results.
+
+
+---
+class: inverse center
+## Thanks for listening
+The RMarkdown for this presentation can be [found on GitHub](https://github.com/mountainMath/presentations/blob/master/cabe.Rmd) if anyone wants to download the code and adapt it for their own purposes. 
+
+### Please post your questions in the chat.
+### .....&lt;span class="blinking-cursor"&gt;|&lt;/span&gt;
+
+&lt;div style="height:30%;"&gt;&lt;/div&gt;
+
+&lt;hr&gt;
+
+You can find me on Twitter at [@vb_jens](https://twitter.com/vb_jens).
+
+My blog has lots of examples with code. [doodles.mountainmath.ca](https://doodles.mountainmath.ca)
+In particular 
+
+[examples using the {cansim} package](https://doodles.mountainmath.ca/categories/cansim/) and 
+
+[examples using the {cancensus} package](https://doodles.mountainmath.ca/categories/cancensus/).
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:10",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
