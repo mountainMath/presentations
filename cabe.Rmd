@@ -32,6 +32,7 @@ library(tidyverse)
 
 
 ## Reproducible and adaptable workflows using StatCan data in R
+Slides are at https://mountainmath.ca/cabe for those wanting to follow along and copy-paste code on their own machine.
 
 --
 * **Reproducible**: can be repeated by others with minimal work, (also auditable)
