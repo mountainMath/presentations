@@ -24,7 +24,6 @@ class: center, middle, inverse, title-slide
 
 
 
-
 ## Reproducible + Adaptable Workflows + Analysis using StatCan Data
 Slides are at https://mountainmath.ca/bcgov_data_science_cop for those wanting to follow along and copy-paste code on their own machine.
 
@@ -435,7 +434,7 @@ seniors_data &lt;- get_tongfen_ca_census(list(CMA="59935"), meta, level="DA") %&
 ggplot(seniors_data,aes(fill=c)) +
   geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
   coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
-  labs(tile="Victoria percentage point change in seniors 2005-2016", fill=NULL)
+  labs(title="Victoria percentage point change in seniors 2006-2016", fill=NULL)
 ```
 
 ![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-16-1.svg)&lt;!-- --&gt;
@@ -512,7 +511,9 @@ all the code to reproduce the graphs in the presentation.
 ]
 .pull-right[
 ### APIs
-In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. .
+
+[BC Open Data API](https://data.gov.bc.ca) is a great example, and it comes with the [`bcdata` R package](https://bcgov.github.io/bcdata/) to facilitate reproducible, transparent and adaptable workflows.
 ]
 --
 
@@ -566,6 +567,14 @@ Simpson's paradox, need a causal model to resolve. Does household size cause hou
 class: center, middle
 
 Thanks for bearing with me. These slides are online at https://mountainmath.ca/bcgov_data_science_cop.html and the R notebook that generated them includes the code that pulls in the data and made the graphs and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/bcgov_data_science_cop.html).
+
+More examples with code can be found [on my blog](https://doodles.mountainmath.ca) with examples involving
+
+ [`cansim`](https://doodles.mountainmath.ca/categories/cansim/)
+
+ [`cancensus`](https://doodles.mountainmath.ca/categories/cancensus/)
+
+ [`tongfen`](https://doodles.mountainmath.ca/categories/tongfen/)
 
 ???
 Our discussion rarely move beyond presenting a simple quotient. We need to move beyond viewing the world through single census variables or simple percentages and dig deeper into the very complex issues we are facing.
