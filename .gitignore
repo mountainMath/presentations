@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+/*_cache/*
+/can_bc_future_housing_supply_affordability*
+/cabe-overflow.Rmd

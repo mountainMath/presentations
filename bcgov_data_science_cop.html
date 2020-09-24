@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>BCGov Data Science CoP</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Jens von Bergmann" />
+    <meta name="date" content="2020-09-24" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# BCGov Data Science CoP
+### Jens von Bergmann
+### 2020-09-24
+
+---
+
+
+
+
+
+
+## Reproducible + Adaptable Workflows + Analysis using StatCan Data
+Slides are at https://mountainmath.ca/bcgov_data_science_cop for those wanting to follow along and copy-paste code on their own machine.
+
+--
+* **Reproducible**: can be repeated by others with minimal work, (also auditable)
+
+--
+* **Adaptable workflows**: can be easily tweaked to accomplish related tasks
+
+--
+* **Analysis**: for this talk we focus on simple descriptive analysis
+
+--
+* **StatCan data**: for this talk this means regular StatCan tables (former CANSIM) and Census data (we won't look at other StatCan data like PUMF)
+
+---
+
+# Reproducibility
+Reproducibility dictates that (ideally) there are no manual steps in the data acquisition, data cleaning, data manipulation, data analysis and presentation or results.
+
+
+In practice some of these steps may require manual intervention, but this should be avoided whenever possible.
+
+--
+
+This may require learning new tools.
+
+.center.large[**DO NOT USE EXCEL!**]
+
+--
+
+... except for data inspection or data entry
+
+---
+# Tools
+Both **R** and **python** make reproducible analysis fairly straight forward. SPSS, SAS, Matlab could also be used, but tend to be more limited in being able to implement a fully reproducible pipeline.
+
+In this talk we will focus on the [*R* programming language](https://www.r-project.org). 
+
+The [RStudio IDE](https://rstudio.com) has a user-friendly interface, and [RMarkdown](https://bookdown.org/yihui/rmarkdown/notebook.html) documents offer a way to seamlessly integrate our entire reproducible pipeline, all the way from data acquisition to presentation of results.
+
+---
+# Data acquisition
+For StatCan data we will use the following packages:
+  - [`cansim` package](https://mountainmath.github.io/cansim/) to access census data via the [StatCan NDM API](https://www.statcan.gc.ca/eng/developers/wds)
+  - [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+  - [`tongfen` package](https://mountainmath.github.io/tongfen/) to work with data across multiple census years
+
+Generally, we will be working in the [`tidyverse` package](https://www.tidyverse.org), an *opinionated collection of R packages* for intuitive general-purpose data manipulations and visualization capabilities. These four packages is (almost) all that's needed for this talk.
+
+
+```r
+library(tidyverse)
+library(cansim)
+library(cancensus)
+library(tongfen)
+```
+
+---
+### RMarkdown
+RMarkdown allows mixing of code and text. Analysis, visualization and report are all one and the same document. 
+
+.pull-left[
+
+```r
+library(tidyverse)
+data(mtcars)
+ggplot(mtcars,aes(x=mpg)) + 
+  geom_histogram(binwidth=4)
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-2-1.svg)&lt;!-- --&gt;
+]
+.pull-right[
+&lt;img src="images/open_rmarkdown3.png" style="height:300px;"&gt;
+
+RMarkdown documents can be compiled to **HTML**, **PDF** or **Word**.
+]
+
+The output of code blocks gets inserted into the document. We can show or hide the actual code.
+
+---
+# cansim
+.pull-left[
+The [`cansim` R package](https://mountainmath.github.io/cansim/) interfaces with the StatCan NDM that replaces the former CANSIM tables. It can be queried for
+- whole tables
+- specific vectors
+- data discovery searching through tables
+
+It encodes the metadata and allows to work with the internal hierarchical structure of the fields.
+]
+.pull-right[
+&lt;img src="https://raw.githubusercontent.com/mountainMath/cansim/master/images/cansim-sticker.png" alt="cansim" style="height:500px;margin-top:-80px;"&gt;
+]
+
+---
+## First example: Motor vehicle sales
+To start off we grab data on motor vehicle sales from table 20-10-0001 and inspect the available variables.
+
+
+```r
+mv_sales &lt;- get_cansim("20-10-0001") %&gt;%
+  normalize_cansim_values(factors=TRUE)
+
+mv_sales %&gt;% select_if(is.factor) %&gt;% sapply(levels)
+```
+
+```
+## $`Vehicle type`
+## [1] "Total, new motor vehicles" "Passenger cars"            "Trucks"                   
+## 
+## $`Origin of manufacture`
+## [1] "Total, country of manufacture" "North America"                 "Total, overseas"              
+## [4] "Japan"                         "Other countries"              
+## 
+## $Sales
+## [1] "Units"   "Dollars"
+## 
+## $`Seasonal adjustment`
+## [1] "Unadjusted"          "Seasonally adjusted"
+```
+
+---
+## Motor vehicle sales (Notes)
+It's always good to check the notes so there are no unexpected hiccups.
+.medium-font[
+
+```r
+mv_notes &lt;- get_cansim_table_notes("20-10-0001")
+knitr::kable(mv_notes)
+```
+
+
+
+|Dimension name        |Note ID |Member Name                          |Note                                                                                                                                |
+|:---------------------|:-------|:------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------|
+|NA                    |1       |NA                                   |Prior to 1953, data for Canadian and United States manufactured vehicles and overseas manufactured vehicles are not segregated.     |
+|Geography             |2       |British Columbia and the Territories |Includes Yukon, Northwest Territories and Nunavut.                                                                                  |
+|Vehicle type          |3       |Trucks                               |Trucks include minivans, sport-utility vehicles, light and heavy trucks, vans and buses.                                            |
+|Origin of manufacture |4       |Total, overseas                      |Includes Japan and other countries.                                                                                                 |
+|Seasonal adjustment   |5       |NA                                   |Seasonally adjusted data for the New Motor Vehicle Sales survey are available for the period between January 1991 to February 2012. |
+]
+
+--
+
+We take note of the definition for **Trucks** and that **seasonally adjusted** data has been discontinued.
+
+---
+## Motor vehicle sales
+
+```r
+plot_data &lt;- mv_sales %&gt;% 
+  filter(GEO=="Canada",
+         `Vehicle type`!="Total, new motor vehicles",
+         `Origin of manufacture`=="Total, country of manufacture",
+         Sales=="Units",
+         `Seasonal adjustment`=="Unadjusted")
+
+ggplot(plot_data,aes(x=Date,y=VALUE,color=`Vehicle type`)) +
+  geom_line() 
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-5-1.svg)&lt;!-- --&gt;
+
+---
+## Motor vehicle sales (nicer graph)
+
+```r
+g&lt;- plot_data %&gt;% filter(Date&gt;=as.Date("1990-01-01")) %&gt;% 
+  ggplot(aes(x=Date,y=VALUE,color=`Vehicle type`)) +
+  theme_light() +
+  geom_line(alpha=0.2) +
+  geom_smooth(span=0.08,se=FALSE) + 
+  scale_y_continuous(labels=function(d)scales::comma(d,scale=1/1000,suffix="k")) +
+  labs(title="Canadian new motor vehicle sales",x=NULL,y="Sales per month",
+       caption="StatCan Table 20-10-0001")
+g 
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-6-1.svg)&lt;!-- --&gt;
+
+
+---
+class: medium-code
+## Motor vehicle sales (annotated graph, final version)
+
+```r
+library(ggrepel)   # (for nicer labels)
+g + geom_text_repel(data=~filter(.,Date==as.Date("1990-08-01"),`Vehicle type`=="Passenger cars"),
+                   label="Passenger cars",show.legend = FALSE,hjust=0,nudge_y = 30000) +
+  geom_text_repel(data=~filter(.,Date==as.Date("2018-10-01"),`Vehicle type`=="Trucks"),
+                   label="Trucks, SUVs, Vans, Buses",show.legend = FALSE,
+                  hjust=1,nudge_x = -2000,nudge_y=10000) +
+  scale_color_manual(values=c("Passenger cars"="steelblue","Trucks"="brown"),guide=FALSE)
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-7-1.svg)&lt;!-- --&gt;
+
+---
+
+## Cigarette sales
+.pull-left[
+Sometimes we are just interested in one specific variable. It can be easier to pull in the StatCan vector.
+
+Vector discovery can be cumbersome, downloaded table data has it. The web view has it too.
+
+We can go to the web view of table right from the R console using the following command.
+
+
+```r
+view_cansim_webpage("16-10-0044")
+```
+
+Selecting the **Add/Remove data** option allows us to filter the data down to what we want and enable the display of StatCan vectors.
+]
+
+
+.pull-right[
+![](images/cigarette_sales.png)
+]
+---
+class: medium-code
+## Cigarette sales
+
+```r
+get_cansim_vector("v28536414","1800-01-01") %&gt;% 
+  normalize_cansim_values() %&gt;%
+  ggplot(aes(x=Date,y=VALUE)) +
+  geom_line() + 
+  geom_smooth(span=0.25,se=FALSE) +
+  labs(title="Canadian cigarette sales",x=NULL,y="Monthly sales",caption="StatCan vector v28536414")
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-9-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Housing consumption share of GDP
+Sometimes we need more data processing to get to quantities we are interested in. One frequent pattern is that we want to look at percent shares of a total.
+
+
+```r
+gdp_data &lt;- get_cansim("36-10-0402") %&gt;% 
+  normalize_cansim_values() %&gt;%
+  filter(Value=="Chained (2012) dollars") %&gt;%
+  select(Date,GEO,naics=`North American Industry Classification System (NAICS)`,VALUE) %&gt;%
+  left_join(filter(.,grepl("T001",naics)) %&gt;% select(Date,GEO,Total=VALUE)) %&gt;%
+  filter(grepl("5311",naics))
+
+gdp_data$naics %&gt;% unique
+```
+
+```
+## [1] "Lessors of real estate [5311]"    "Owner-occupied dwellings [5311A]"
+```
+
+Here we cut down to Chained (2012) dollars and joined the **Total** GDP as another column, and we check that NAICS sub-codes starting with **5311** correspond to housing consumption.
+
+--
+
+
+```r
+housing_consumption &lt;- gdp_data %&gt;% 
+  group_by(Date,GEO) %&gt;% 
+  summarize(Share=sum(VALUE)/first(Total)) %&gt;%
+  mutate(highlight=GEO %in% c("British Columbia","Alberta","Ontario","Quebec"))
+```
+
+We compute the combined share of those two categories for each Date and Geography.
+
+---
+class: medium-code
+## Housing consumption share of GDP
+
+```r
+ggplot(housing_consumption,aes(x=Date,y=Share,group=GEO)) +
+  geom_line(data=~filter(.,!highlight),color="grey") + 
+  geom_line(data=~filter(.,highlight),aes(color=GEO),size=2) +
+  theme_light() + scale_y_continuous(labels=scales::percent) +
+  labs(title="Housing consumption as share of GDP",caption="StatCan Table 36-10-0402",fill=NULL,x=NULL)
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-12-1.svg)&lt;!-- --&gt;
+
+---
+## Census data
+Census data offers much richer variables and spatial resolution, but at coarse time intervals.
+
+Richer data comes at a price: Data discovery and acquisition is more complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a quick tour of CensusMapper...
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/maps/731?index=0#11/48.4636/-123.4108" target="_blank"&gt;CensusMapper Demo&lt;/a&gt;
+
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
+---
+# Age pyramids
+How does the net migration effect the age distribution in each municipality? 
+
+
+```r
+cancensusHelpers::get_age_data('CA16',list(CSD=c("5917034","5917030","5917021"))) %&gt;% 
+  ggplot(aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") + age_pyramid_styling
+```
+
+![](bcgov_data_science_cop_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
+
+--
+
+How to get the data to easily make these graphs?
+
+???
+Explain how net migration patterns lead to different age distributions.
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), and ideally install it in your `.Rprofile` so it's always available and won't expose your API key when sharing code.
+]
+.pull-right[
+&lt;img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;"&gt;
+]
+
+---
+background-image: url("images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/api" target="_blank"&gt;CensusMapper API Demo&lt;/a&gt;
+
+---
+class: medium-code
+## Census data
+
+```r
+get_census("CA16",regions=list(CMA="59935"),geo_format="sf",level="CT",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719")) %&gt;%
+  ggplot(aes(fill=movers/base)) +
+  geom_sf(size=0.1) + coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Victoria share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-14-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Mixing census data with StatCan Tables
+
+```r
+geo_data &lt;- get_census("CA16",regions=list(CMA="59933"),geo_format = 'sf',level="CSD")
+chsp_data &lt;- get_cansim("46-10-0049") %&gt;% normalize_cansim_values(factors = TRUE) %&gt;%
+  filter(`Owner-occupied property type` == "Condominium apartment",
+         `Owner characteristics at the property level`=="None of the owners receive pension income",
+         Estimates=="Median ratio of assessment value to total income") 
+ggplot(left_join(geo_data,chsp_data),aes(fill=VALUE)) + 
+  geom_sf() + scale_fill_viridis_c(option = "magma",trans="log", breaks=c(5,7.5,10,15,20)) + 
+  coord_sf(datum = NA,ylim=c(49,49.4),xlim=c(-123.3,-122.5)) +
+  labs(title="Median ratio of assessment value to total income\nfor non-pensioner condo owners",
+       caption="StatCan Table 46-10-0049",fill=NULL)
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-15-1.svg)&lt;!-- --&gt;
+
+---
+# Census timelines
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+The higher frequency tables (CANSIM) split the timelines along census geographies, with overlap to facilitate splicing them together.
+
+A better way to do this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).]
+.pull-right[
+&lt;img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;"&gt;
+]
+
+---
+class: medium-code
+# Tongfen
+
+```r
+meta &lt;- meta_for_ca_census_vectors(c(seniors_CA16="v_CA16_2522",seniors_CA06="v_CA06_92")) %&gt;%
+  bind_rows(meta_for_additive_variables(c("CA16","CA06"),"Population"))
+seniors_data &lt;- get_tongfen_ca_census(list(CMA="59935"), meta, level="DA") %&gt;%
+  mutate(change=seniors_CA16/Population_CA16-seniors_CA06/Population_CA06) %&gt;%
+  mutate(c=mountainmathHelpers::pretty_cut(change,c(-Inf,seq(-0.2,0.2,0.05),Inf),format=scales::percent))
+ggplot(seniors_data,aes(fill=c)) +
+  geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
+  coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  labs(tile="Victoria percentage point change in seniors 2005-2016", fill=NULL)
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-16-1.svg)&lt;!-- --&gt;
+
+
+---
+# TongFen with T1FF data
+
+```r
+years &lt;- seq(2004,2018)
+variables &lt;- setNames(c(paste0("v_TX",years,"_607"),paste0("v_TX",years,"_786")),
+                      c(paste0("families_",years),paste0("lico_",years)))
+meta &lt;-meta_for_ca_census_vectors(variables)
+
+low_income &lt;- get_tongfen_ca_census(regions = list(CMA=59933), meta=meta, level="CT") %&gt;%
+  mutate(`2004-2018`=lico_2018/families_2018-lico_2004/families_2004,
+         `2004-2011`=lico_2011/families_2011-lico_2004/families_2004,
+         `2011-2018`=lico_2018/families_2018-lico_2011/families_2011)
+```
+--
+
+```r
+head(meta)
+```
+
+```
+## # A tibble: 6 x 10
+##   variable     label         dataset type     aggregation units  rule     parent geo_dataset  year
+##   &lt;chr&gt;        &lt;chr&gt;         &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;       &lt;chr&gt;  &lt;chr&gt;    &lt;lgl&gt;  &lt;chr&gt;       &lt;int&gt;
+## 1 v_TX2004_607 families_2004 TX2004  Original Additive    Number Additive NA     CA01         2004
+## 2 v_TX2005_607 families_2005 TX2005  Original Additive    Number Additive NA     CA01         2005
+## 3 v_TX2006_607 families_2006 TX2006  Original Additive    Number Additive NA     CA06         2006
+## 4 v_TX2007_607 families_2007 TX2007  Original Additive    Number Additive NA     CA06         2007
+## 5 v_TX2008_607 families_2008 TX2008  Original Additive    Number Additive NA     CA06         2008
+## 6 v_TX2009_607 families_2009 TX2009  Original Additive    Number Additive NA     CA06         2009
+```
+
+---
+# Low income families from T1FF data
+
+```r
+low_income %&gt;% pivot_longer(starts_with("20")) %&gt;% st_sf() %&gt;%
+  ggplot(aes(fill=value)) + facet_wrap("name") +
+  geom_sf(size=0.1) + scale_fill_gradient2(labels=scales::percent) +
+  coord_sf(datum=NA,xlim=c(-123.25,-122.8),ylim=c(49.1,49.35)) +
+  labs(title="Change in low share of families in low income 2004-2018", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-19-1.svg)&lt;!-- --&gt;
+
+---
+# Iterating
+With each analysis we gain insight, but also gain ability to ask better questions. And iterate by adapting the code for previous analysis to go deeper. Reproducible and adaptable workflows facilitate this.
+.pull-left[
+StatCan D-index measuring income mixing
+
+![D-index](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation_files/figure-html/vancouver_d_index-1.png)
+]
+.pull-right[
+Finer categorization of how income mixes
+
+![income mixing](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time_files/figure-html/unnamed-chunk-15-1.png)
+]
+---
+
+# Reproducibility, Transparency, Adaptability
+We need to adopt a more collaborative approach to understanding civic issues.
+
+.pull-left[
+### Notebooks
+A data Notebook is a document that integrates explanatory text and data analysis. In its crudest form this could be an Excel spreadsheet with embedded comments. At the other end of the spectrum are R or Python Notebooks. In fact, this presentation is an R notebook and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/working_with_census.Rmd). It contains
+all the code to reproduce the graphs in the presentation.
+]
+.pull-right[
+### APIs
+In order to be reproducible, any analysis should ship with code and the data. But that's not very adaptable. To be adaptable, the data should come through APIs. That way one can easily make changes that requires slightly different data, e.g. use related census variables, other time frames or geographic regions.
+]
+--
+
+.center[**Should become standard as base for public policy.**]
+
+--
+
+I will leave you with some quiz questions.
+
+???
+This is key to building an ecosystem of people and groups that collaborate to advance understanding of civic issues. Opening up your analysis for everyone to see and pluck apart might be uncomfortable at first, but it's essential to take the discussion to the next level. It increases transparency and trust, and allows others to build on your work.
+---
+# Question 1
+
+Has affordability in the City of Vancouver gotten better or worse?
+
+--
+
+
+
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-21-1.svg)&lt;!-- --&gt;
+
+Diverging Narratives that need to be reconciled: At ecological level, it looks like things got worse. At individual levels, it looks like like they got better.
+
+---
+# Question 2
+
+How about affordability in the City of Victoria?
+
+--
+
+![](bcgov_data_science_cop_files/figure-html/unnamed-chunk-22-1.svg)&lt;!-- --&gt;
+
+These metrics say it got better! Need to go deeper and look at distributions. How about first time buyers?
+
+---
+# Question 3
+Which city has higher incomes, Toronto or Vancouver?
+
+--
+
+
+
+
+![](bcgov_data_science_cop_files/figure-html/income-1.svg)&lt;!-- --&gt;
+
+Simpson's paradox, need a causal model to resolve. Does household size cause household income, or does income cause household size?
+
+---
+class: center, middle
+
+Thanks for bearing with me. These slides are online at https://mountainmath.ca/bcgov_data_science_cop.html and the R notebook that generated them includes the code that pulls in the data and made the graphs and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/bcgov_data_science_cop.html).
+
+???
+Our discussion rarely move beyond presenting a simple quotient. We need to move beyond viewing the world through single census variables or simple percentages and dig deeper into the very complex issues we are facing.
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:10",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

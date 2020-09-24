@@ -4,6 +4,9 @@
 .short-title h1 {margin-bottom: 0;}
 .single-line p {display:inline;padding:0;}
 
+.small-font {font-size: 12px;}
+.medium-font {font-size: 14px;}
+
 .blinking-cursor {
   font-weight: 100;
   font-size: 30px;
