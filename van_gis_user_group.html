@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Canadian census data using R</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Jens von Bergmann" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <script src="libs/htmlwidgets/htmlwidgets.js"></script>
+    <script src="libs/mapdeck-binding/mapdeck.js"></script>
+    <script src="libs/mpadeck_functions/mapdeck_functions.js"></script>
+    <script src="libs/deckgl/deckgl.min.js"></script>
+    <script src="libs/legend/legend.js"></script>
+    <script src="libs/title/title.js"></script>
+    <script src="libs/mapdeck_location/mapdeck_location.js"></script>
+    <script src="libs/mapdeck_colours/mapdeck_colours.js"></script>
+    <script src="libs/mapdeck_coordinates/mapdeck_coordinates.js"></script>
+    <link href="libs/mapboxgl/mapbox-gl.css" rel="stylesheet" />
+    <script src="libs/mapboxgl/mapbox-gl.js"></script>
+    <link href="libs/mapdeck/mapdeck.css" rel="stylesheet" />
+    <script src="libs/mpadeck-binding/mapdeck.js"></script>
+    <script src="libs/polygon/polygon.js"></script>
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Canadian census data using R
+## Reproducible and adaptable workflows
+### Jens von Bergmann
+### 2020/10/14
+
+---
+
+
+
+
+## Overview
+We will showcase how to access and analyze Canadian census data using R. Using a case study of analyzing how select census variables have changed through time, we will show how to
+
+1. get pinpointed access to census data for just the variables, geographies and census years we need
+2. make census data comparable across census years
+3. run analysis and map the results
+4. adapt the code to re-run the analysis for a different geographic region or using a different set of variables.
+
+The goal is to highlight the strengths and limitations to a 100% script-based workflow. The presentation will require some familiarity with census data, geographies and geospatial analysis, but won’t assume prior exposure to R.
+
+
+---
+# Tools
+Both **R** and **python** make reproducible analysis fairly straight forward. SPSS, SAS, Matlab could also be used, but tend to be more limited in being able to implement a fully reproducible pipeline.
+
+In this talk we will focus on the [*R* programming language](https://www.r-project.org). 
+
+The [RStudio IDE](https://rstudio.com) has a user-friendly interface, and [RMarkdown](https://bookdown.org/yihui/rmarkdown/notebook.html) documents offer a way to seamlessly integrate our entire reproducible pipeline, all the way from data acquisition to presentation of results.
+
+---
+### RMarkdown
+RMarkdown allows mixing of code and text. Analysis, visualization and report are all one and the same document. 
+
+.pull-left[
+
+```r
+library(tidyverse)
+data(mtcars)
+ggplot(mtcars,aes(x=mpg)) + 
+  geom_histogram(binwidth=4)
+```
+
+![](van_gis_user_group_files/figure-html/unnamed-chunk-1-1.svg)&lt;!-- --&gt;
+]
+.pull-right[
+&lt;img src="images/open_rmarkdown3.png" style="height:300px;"&gt;
+
+RMarkdown documents can be compiled to **HTML**, **PDF** or **Word**.
+]
+
+The output of code blocks gets inserted into the document. We can show or hide the actual code.
+
+---
+# Data acquisition and processing
+For this talk we will use the following packages:
+  - [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+  - [`tongfen` package](https://mountainmath.github.io/tongfen/) to work with data across multiple census years
+  - [`sf` package](https://r-spatial.github.io/sf/index.html) for basic geospatial operations
+
+Generally, we will be working in the [`tidyverse` package](https://www.tidyverse.org), an *opinionated collection of R packages* for intuitive general-purpose data manipulations and visualization capabilities. These four packages is (almost) all that's needed for this talk.
+
+
+```r
+library(tidyverse)
+library(cancensus)
+library(tongfen)
+library(sf)
+```
+
+---
+## Census data
+Census data offers much richer variables and spatial resolution, but at coarse time intervals.
+
+Richer data comes at a price: Data discovery and acquisition can be complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a quick tour of CensusMapper...
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/maps/731" target="_blank"&gt;CensusMapper Demo&lt;/a&gt;
+
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
+---
+# Maps aren't analysis
+Maps are only one element in the toolbox to communicate the result of analysis. We usually present maps to complement a range of other visuals and other analysis results.
+
+How does the net migration effect the age distribution in each municipality? 
+
+
+```r
+cancensusHelpers::get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %&gt;%
+  ggplot(aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") + age_pyramid_styling
+```
+
+![](van_gis_user_group_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
+
+--
+
+How to get the data to easily make these graphs?
+
+???
+Explain how net migration patterns lead to different age distributions.
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), and ideally install it in your `.Rprofile` so it's always available and won't expose your API key when sharing code.
+]
+.pull-right[
+&lt;img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;"&gt;
+]
+
+---
+background-image: url("images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/api" target="_blank"&gt;CensusMapper API Demo&lt;/a&gt;
+
+---
+class: medium-code
+## Census data
+
+```r
+get_census("CA16",regions=list(CMA="59935"),geo_format="sf",level="CT",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719")) %&gt;%
+  ggplot(aes(fill=movers/base)) +
+  geom_sf(size=0.1) + coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Victoria share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+```
+
+![](van_gis_user_group_files/figure-html/unnamed-chunk-4-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Census data
+
+```r
+data &lt;- get_census("CA16",regions=list(CMA="59933"),geo_format="sf",level="CT",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719"))
+g &lt;- ggplot(data,aes(fill=movers/base)) + 
+  geom_sf(size=0.1) + coord_sf(datum = NA,ylim=c(49.15,49.4),xlim=c(-123.4,-122.7)) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Vancouver share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+g
+```
+
+![](van_gis_user_group_files/figure-html/unnamed-chunk-5-1.svg)&lt;!-- --&gt;
+---
+## Add minimal styling
+
+```r
+library(mountainmathHelpers)
+g +
+  geom_water() +
+  geom_roads(color="white") +
+  coord_sf(datum = NA,ylim=c(49.15,49.4),xlim=c(-123.4,-122.7)) 
+```
+
+![](van_gis_user_group_files/figure-html/unnamed-chunk-6-1.svg)&lt;!-- --&gt;
+
+---
+## Interactive maps
+
+
+```r
+library(mapdeck)
+mapdeck(token = getOption("mapbox_token"), style = mapdeck_style('dark')) %&gt;%
+  add_sf(data = data %&gt;% mutate(share=movers/base) %&gt;% filter(CSD_UID=="5915022") %&gt;% 
+           rmapshaper::ms_simplify(keep = 0.2) %&gt;% select(GeoUID,share), 
+              tooltip = "GeoUID", fill_opacity=150, fill_colour="share")
+```
+
+<div id="htmlwidget-a2111ecb878c2d3a468c" style="width:720px;height:360px;" class="mapdeck html-widget"></div>
+<script type="application/json" data-for="htmlwidget-a2111ecb878c2d3a468c">{"x":{"access_token":"pk.eyJ1IjoiamVucy1tb3VudGFpbm1hdGgiLCJhIjoiTmJ2Z3FHNCJ9.ifMzNW0vPH1Yc6As93HP9A","style":"mapbox://styles/mapbox/dark-v10","pitch":0,"zoom":0,"location":[0,0],"bearing":0,"max_zoom":20,"min_zoom":0,"max_pitch":60,"min_pitch":0,"show_view_state":false,"repeat_view":false,"calls":[{"functions":"add_polygon_geo","args":["mapdeck",[{"type":"Feature","properties":{"elevation":0,"fill_colour":"#39558C96","stroke_colour":"#440154FF","tooltip":"9330017.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.042335,49.235939],[-123.045899,49.236422],[-123.058123,49.241871],[-123.056659,49.244612],[-123.047122,49.244605],[-123.037758,49.240698],[-123.042335,49.235939]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#44398396","stroke_colour":"#440154FF","tooltip":"9330008.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.168237,49.21446],[-123.180355,49.215699],[-123.191296,49.21944],[-123.190944,49.226534],[-123.191436,49.228],[-123.197049,49.230576],[-123.197081,49.235052],[-123.195749,49.234773],[-123.178715,49.234761],[-123.167394,49.23473],[-123.167431,49.227316],[-123.168416,49.225789],[-123.167988,49.216153],[-123.168237,49.21446]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#46327F96","stroke_colour":"#440154FF","tooltip":"9330014.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.059362,49.220204],[-123.069192,49.220327],[-123.07197,49.219961],[-123.071762,49.225219],[-123.059158,49.22504],[-123.059362,49.220204]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#47116396","stroke_colour":"#440154FF","tooltip":"9330014.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.057935,49.229396],[-123.059078,49.229407],[-123.059158,49.22504],[-123.071762,49.225219],[-123.071514,49.23263],[-123.064742,49.232906],[-123.058868,49.232833],[-123.057935,49.229396]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#EDE51B96","stroke_colour":"#440154FF","tooltip":"9330059.13"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.102139,49.277123],[-123.107675,49.277216],[-123.108961,49.276812],[-123.115206,49.280576],[-123.111922,49.282764],[-123.109758,49.281458],[-123.105595,49.28071],[-123.106113,49.279457],[-123.102155,49.279286],[-123.102139,49.277123]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#7AD15196","stroke_colour":"#440154FF","tooltip":"9330059.14"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.102139,49.277123],[-123.099782,49.276758],[-123.099934,49.272856],[-123.102926,49.272697],[-123.103578,49.275548],[-123.106779,49.275581],[-123.108771,49.274292],[-123.114737,49.272584],[-123.115366,49.274486],[-123.120094,49.277348],[-123.115206,49.280576],[-123.108961,49.276812],[-123.107675,49.277216],[-123.102139,49.277123]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#24AA8396","stroke_colour":"#440154FF","tooltip":"9330005.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.117053,49.210249],[-123.117028,49.203875],[-123.125831,49.200125],[-123.126812,49.199348],[-123.132423,49.198535],[-123.13663,49.199135],[-123.140227,49.200197],[-123.140852,49.201914],[-123.140534,49.208535],[-123.130258,49.208474],[-123.1217,49.20827],[-123.117053,49.210249]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2D718E96","stroke_colour":"#440154FF","tooltip":"9330009.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.139811,49.226967],[-123.167431,49.227316],[-123.167394,49.23473],[-123.165832,49.234729],[-123.155268,49.234581],[-123.139624,49.234344],[-123.139811,49.226967]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3A548B96","stroke_colour":"#440154FF","tooltip":"9330011.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.090942,49.218274],[-123.101888,49.218467],[-123.106116,49.218567],[-123.106122,49.217726],[-123.11671,49.217807],[-123.116664,49.219058],[-123.11638,49.226072],[-123.090711,49.225443],[-123.090942,49.218274]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3C508B96","stroke_colour":"#440154FF","tooltip":"9330012.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.090711,49.225443],[-123.11638,49.226072],[-123.116018,49.233596],[-123.112482,49.233393],[-123.090549,49.232918],[-123.090711,49.225443]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#20928C96","stroke_colour":"#440154FF","tooltip":"9330027.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.150248,49.247585],[-123.146973,49.242895],[-123.148612,49.240498],[-123.152728,49.240836],[-123.154561,49.240233],[-123.155136,49.238287],[-123.165734,49.238477],[-123.165157,49.245787],[-123.163584,49.245148],[-123.159203,49.245584],[-123.154717,49.24766],[-123.150248,49.247585]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#365D8D96","stroke_colour":"#440154FF","tooltip":"9330002.04"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.059173,49.211611],[-123.057876,49.21245],[-123.055121,49.212422],[-123.055387,49.210055],[-123.056845,49.207573],[-123.056445,49.20466],[-123.058769,49.204656],[-123.067527,49.206147],[-123.070988,49.207551],[-123.072028,49.214578],[-123.070043,49.214558],[-123.068357,49.213015],[-123.06368,49.211455],[-123.059173,49.211611]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#21A68596","stroke_colour":"#440154FF","tooltip":"9330016.06"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023456,49.234325],[-123.023477,49.232295],[-123.024844,49.232238],[-123.024823,49.234128],[-123.028144,49.23413],[-123.030456,49.235178],[-123.02976,49.236224],[-123.031849,49.238241],[-123.023456,49.234325]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#42418696","stroke_colour":"#440154FF","tooltip":"9330013.03"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.080058,49.218152],[-123.090942,49.218274],[-123.090711,49.225443],[-123.08005,49.225331],[-123.080058,49.218152]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#443B8496","stroke_colour":"#440154FF","tooltip":"9330013.04"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.072021,49.218093],[-123.080058,49.218152],[-123.08005,49.225331],[-123.071762,49.225219],[-123.07197,49.219961],[-123.072021,49.218093]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2F6C8E96","stroke_colour":"#440154FF","tooltip":"9330027.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.150248,49.247585],[-123.154717,49.24766],[-123.159203,49.245584],[-123.163584,49.245148],[-123.165157,49.245787],[-123.165417,49.246482],[-123.164927,49.257649],[-123.162662,49.257417],[-123.150769,49.257254],[-123.150854,49.251899],[-123.151792,49.250091],[-123.150248,49.247585]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2B768E96","stroke_colour":"#440154FF","tooltip":"9330042.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.164927,49.257649],[-123.178091,49.257898],[-123.186091,49.258021],[-123.185879,49.26437],[-123.164639,49.264041],[-123.164927,49.257649]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2FB37C96","stroke_colour":"#440154FF","tooltip":"9330063.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.136304,49.283712],[-123.141822,49.28727],[-123.138616,49.28938],[-123.133115,49.285787],[-123.136304,49.283712]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#42BE7196","stroke_colour":"#440154FF","tooltip":"9330038.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.089835,49.256404],[-123.101238,49.256579],[-123.100888,49.262908],[-123.089135,49.262482],[-123.089209,49.25794],[-123.089835,49.256404]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3D4D8A96","stroke_colour":"#440154FF","tooltip":"9330044.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.1857,49.273298],[-123.185687,49.268607],[-123.185829,49.265247],[-123.202946,49.265473],[-123.215103,49.265673],[-123.215041,49.267368],[-123.219569,49.267238],[-123.219599,49.268979],[-123.223913,49.272865],[-123.224221,49.276543],[-123.223768,49.278091],[-123.216373,49.277542],[-123.21556,49.276652],[-123.211127,49.275339],[-123.202085,49.276488],[-123.19819,49.27537],[-123.196326,49.273286],[-123.194565,49.272714],[-123.1857,49.273298]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#39568C96","stroke_colour":"#440154FF","tooltip":"9330025.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.178596,49.246154],[-123.196753,49.24622],[-123.198913,49.246306],[-123.204607,49.249128],[-123.200555,49.250048],[-123.196761,49.250241],[-123.196545,49.256523],[-123.202924,49.256694],[-123.203216,49.258267],[-123.186091,49.258021],[-123.178091,49.257898],[-123.178549,49.256596],[-123.178596,49.246154]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2BB17E96","stroke_colour":"#440154FF","tooltip":"9330048.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.138784,49.274916],[-123.145065,49.272848],[-123.145484,49.270666],[-123.141079,49.270564],[-123.138411,49.269158],[-123.138469,49.266183],[-123.138563,49.26359],[-123.145757,49.263702],[-123.150544,49.263782],[-123.150389,49.268082],[-123.150223,49.272514],[-123.152602,49.272549],[-123.152519,49.27464],[-123.149784,49.277904],[-123.144445,49.278922],[-123.140895,49.277721],[-123.138784,49.274916]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3B518B96","stroke_colour":"#440154FF","tooltip":"9330019.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.090549,49.232918],[-123.112482,49.233393],[-123.116018,49.233596],[-123.115892,49.238051],[-123.118338,49.241081],[-123.117765,49.243224],[-123.115379,49.24516],[-123.110886,49.24454],[-123.10663,49.240779],[-123.103419,49.240532],[-123.090377,49.240303],[-123.090549,49.232918]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#218E8D96","stroke_colour":"#440154FF","tooltip":"9330058.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.077925,49.287233],[-123.077995,49.284397],[-123.0771,49.281344],[-123.081305,49.280967],[-123.093427,49.281238],[-123.099687,49.281347],[-123.09907,49.285058],[-123.099738,49.28651],[-123.099678,49.287757],[-123.099125,49.290267],[-123.09186,49.28789],[-123.089523,49.288899],[-123.086688,49.288137],[-123.085296,49.286222],[-123.081557,49.286351],[-123.077925,49.287233]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3B528B96","stroke_colour":"#440154FF","tooltip":"9330020.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.116018,49.233596],[-123.139624,49.234344],[-123.139313,49.241887],[-123.127824,49.241438],[-123.118338,49.241081],[-123.115892,49.238051],[-123.116018,49.233596]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#443C8496","stroke_colour":"#440154FF","tooltip":"9330021.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.139313,49.241887],[-123.139624,49.234344],[-123.155268,49.234581],[-123.155136,49.238287],[-123.154561,49.240233],[-123.152728,49.240836],[-123.148612,49.240498],[-123.146973,49.242895],[-123.150248,49.247585],[-123.151792,49.250091],[-123.150854,49.251899],[-123.150769,49.257254],[-123.14598,49.257179],[-123.138794,49.257054],[-123.139313,49.241887]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#218F8D96","stroke_colour":"#440154FF","tooltip":"9330022.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.155268,49.234581],[-123.165832,49.234729],[-123.165734,49.238477],[-123.155136,49.238287],[-123.155268,49.234581]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48297996","stroke_colour":"#440154FF","tooltip":"9330023.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.165832,49.234729],[-123.167394,49.23473],[-123.178715,49.234761],[-123.178596,49.246154],[-123.166185,49.246105],[-123.165157,49.245787],[-123.165734,49.238477],[-123.165832,49.234729]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#472E7C96","stroke_colour":"#440154FF","tooltip":"9330024.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.178715,49.234761],[-123.195749,49.234773],[-123.197081,49.235052],[-123.198398,49.23649],[-123.196822,49.23864],[-123.196753,49.24622],[-123.178596,49.246154],[-123.178715,49.234761]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#443A8396","stroke_colour":"#440154FF","tooltip":"9330026.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.165157,49.245787],[-123.166185,49.246105],[-123.178596,49.246154],[-123.178549,49.256596],[-123.178091,49.257898],[-123.164927,49.257649],[-123.165417,49.246482],[-123.165157,49.245787]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#277F8E96","stroke_colour":"#440154FF","tooltip":"9330028.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.127211,49.257117],[-123.127824,49.241438],[-123.139313,49.241887],[-123.138794,49.257054],[-123.136308,49.257943],[-123.131803,49.257107],[-123.127211,49.257117]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#277E8E96","stroke_colour":"#440154FF","tooltip":"9330029.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.118338,49.241081],[-123.127824,49.241438],[-123.127211,49.257117],[-123.115053,49.256913],[-123.115295,49.249049],[-123.115379,49.24516],[-123.117765,49.243224],[-123.118338,49.241081]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#39568C96","stroke_colour":"#440154FF","tooltip":"9330030.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.090377,49.240303],[-123.103419,49.240532],[-123.10663,49.240779],[-123.110886,49.24454],[-123.115379,49.24516],[-123.115295,49.249049],[-123.101071,49.248771],[-123.090155,49.248662],[-123.090377,49.240303]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#375B8D96","stroke_colour":"#440154FF","tooltip":"9330016.05"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.024844,49.232238],[-123.032116,49.23223],[-123.037804,49.235038],[-123.042335,49.235939],[-123.037758,49.240698],[-123.031849,49.238241],[-123.02976,49.236224],[-123.030456,49.235178],[-123.028144,49.23413],[-123.024823,49.234128],[-123.024844,49.232238]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#55C66796","stroke_colour":"#440154FF","tooltip":"9330066.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.114457,49.288978],[-123.122804,49.283282],[-123.129948,49.287919],[-123.126641,49.290863],[-123.123284,49.291449],[-123.118994,49.289867],[-123.117634,49.290547],[-123.114457,49.288978]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#72CF5696","stroke_colour":"#440154FF","tooltip":"9330064.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.129183,49.279078],[-123.133353,49.281806],[-123.136304,49.283712],[-123.133115,49.285787],[-123.126038,49.281195],[-123.129183,49.279078]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#81D34D96","stroke_colour":"#440154FF","tooltip":"9330065.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.126038,49.281195],[-123.133115,49.285787],[-123.129948,49.287919],[-123.122804,49.283282],[-123.126038,49.281195]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#365D8D96","stroke_colour":"#440154FF","tooltip":"9330033.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.080156,49.24024],[-123.090377,49.240303],[-123.090155,49.248662],[-123.080035,49.24855],[-123.080156,49.24024]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#23A88496","stroke_colour":"#440154FF","tooltip":"9330068.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.132439,49.293577],[-123.135476,49.291479],[-123.138616,49.28938],[-123.143432,49.292385],[-123.146541,49.290011],[-123.150152,49.292839],[-123.150641,49.29498],[-123.152855,49.29548],[-123.154472,49.297655],[-123.157747,49.297794],[-123.158831,49.301219],[-123.157044,49.302204],[-123.155856,49.308744],[-123.152833,49.310088],[-123.151683,49.311825],[-123.1498,49.312691],[-123.141425,49.314079],[-123.136613,49.309847],[-123.135516,49.307033],[-123.131769,49.305014],[-123.129426,49.302795],[-123.126373,49.302699],[-123.125379,49.301773],[-123.121167,49.299997],[-123.116366,49.300462],[-123.116595,49.298509],[-123.118809,49.297868],[-123.12224,49.29507],[-123.123973,49.295047],[-123.125163,49.297717],[-123.128416,49.295951],[-123.130003,49.297497],[-123.134952,49.296618],[-123.132439,49.293577]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#38588C96","stroke_colour":"#440154FF","tooltip":"9330033.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.07363,49.240185],[-123.07401,49.240189],[-123.080156,49.24024],[-123.080035,49.24855],[-123.073367,49.248498],[-123.07363,49.240185]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#423F8596","stroke_colour":"#440154FF","tooltip":"9330051.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.044314,49.261948],[-123.056591,49.262132],[-123.056604,49.269553],[-123.044217,49.269576],[-123.044314,49.261948]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#443B8496","stroke_colour":"#440154FF","tooltip":"9330051.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.056591,49.262132],[-123.065916,49.262295],[-123.065769,49.269561],[-123.056604,49.269553],[-123.056591,49.262132]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#1E9C8996","stroke_colour":"#440154FF","tooltip":"9330067.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.133115,49.285787],[-123.138616,49.28938],[-123.135476,49.291479],[-123.129948,49.287919],[-123.133115,49.285787]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#73D05596","stroke_colour":"#440154FF","tooltip":"9330067.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.126641,49.290863],[-123.129948,49.287919],[-123.135476,49.291479],[-123.132439,49.293577],[-123.126641,49.290863]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#443A8396","stroke_colour":"#440154FF","tooltip":"9330002.03"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.059173,49.211611],[-123.06368,49.211455],[-123.068357,49.213015],[-123.070043,49.214558],[-123.072028,49.214578],[-123.072021,49.218093],[-123.07197,49.219961],[-123.069192,49.220327],[-123.059362,49.220204],[-123.059173,49.211611]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#21908C96","stroke_colour":"#440154FF","tooltip":"9330059.07"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.132468,49.276993],[-123.125855,49.273178],[-123.123389,49.270433],[-123.127872,49.270801],[-123.132371,49.272856],[-123.136187,49.275751],[-123.132468,49.276993]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#287D8E96","stroke_colour":"#440154FF","tooltip":"9330059.08"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.114737,49.272584],[-123.119187,49.272744],[-123.120983,49.270664],[-123.123389,49.270433],[-123.125855,49.273178],[-123.123274,49.275247],[-123.120094,49.277348],[-123.115366,49.274486],[-123.114737,49.272584]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#FDE72596","stroke_colour":"#440154FF","tooltip":"9330059.09"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.123274,49.275247],[-123.125855,49.273178],[-123.132468,49.276993],[-123.129183,49.279078],[-123.123274,49.275247]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#D7E21996","stroke_colour":"#440154FF","tooltip":"9330059.11"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.114457,49.288978],[-123.106799,49.289732],[-123.112671,49.287622],[-123.108698,49.286317],[-123.108823,49.284311],[-123.110919,49.284708],[-123.111922,49.282764],[-123.115206,49.280576],[-123.120094,49.277348],[-123.126038,49.281195],[-123.122804,49.283282],[-123.114457,49.288978]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#32648E96","stroke_colour":"#440154FF","tooltip":"9330032.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.075806,49.256595],[-123.069821,49.256365],[-123.066273,49.25296],[-123.071965,49.252533],[-123.07328,49.251657],[-123.073352,49.248944],[-123.073367,49.248498],[-123.080035,49.24855],[-123.090155,49.248662],[-123.089835,49.256404],[-123.075881,49.256221],[-123.075806,49.256595]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3C508B96","stroke_colour":"#440154FF","tooltip":"9330018.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.074292,49.232629],[-123.090549,49.232918],[-123.090377,49.240303],[-123.080156,49.24024],[-123.07401,49.240189],[-123.074292,49.232629]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3F488996","stroke_colour":"#440154FF","tooltip":"9330015.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.041281,49.220159],[-123.059362,49.220204],[-123.059158,49.22504],[-123.059078,49.229407],[-123.057935,49.229396],[-123.043105,49.229303],[-123.040817,49.229278],[-123.041281,49.220159]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3F488996","stroke_colour":"#440154FF","tooltip":"9330052.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023528,49.261541],[-123.025439,49.263059],[-123.028501,49.261786],[-123.033646,49.261899],[-123.044314,49.261948],[-123.044217,49.269576],[-123.023461,49.269529],[-123.023528,49.261541]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48217296","stroke_colour":"#440154FF","tooltip":"9330052.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023404,49.277558],[-123.023461,49.269529],[-123.044217,49.269576],[-123.044106,49.277465],[-123.03077,49.277432],[-123.023404,49.277558]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3D4E8A96","stroke_colour":"#440154FF","tooltip":"9330018.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.058868,49.232833],[-123.064742,49.232906],[-123.071514,49.23263],[-123.074292,49.232629],[-123.07401,49.240189],[-123.07363,49.240185],[-123.058711,49.239791],[-123.058868,49.232833]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#45378196","stroke_colour":"#440154FF","tooltip":"9330015.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023512,49.229234],[-123.02348,49.225199],[-123.032244,49.225248],[-123.032391,49.220122],[-123.041281,49.220159],[-123.040817,49.229278],[-123.023512,49.229234]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#1F988B96","stroke_colour":"#440154FF","tooltip":"9330050.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.065916,49.262295],[-123.077481,49.262392],[-123.077429,49.265175],[-123.077366,49.269649],[-123.065769,49.269561],[-123.065916,49.262295]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#472D7B96","stroke_colour":"#440154FF","tooltip":"9330036.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.034091,49.244513],[-123.042164,49.244549],[-123.041616,49.248752],[-123.044156,49.250672],[-123.044314,49.261948],[-123.033646,49.261899],[-123.03379,49.245105],[-123.034091,49.244513]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#443B8496","stroke_colour":"#440154FF","tooltip":"9330036.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023528,49.261541],[-123.023558,49.244428],[-123.034091,49.244513],[-123.03379,49.245105],[-123.033646,49.261899],[-123.028501,49.261786],[-123.025439,49.263059],[-123.023528,49.261541]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#46348096","stroke_colour":"#440154FF","tooltip":"9330016.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023512,49.229234],[-123.040817,49.229278],[-123.043105,49.229303],[-123.04309,49.234816],[-123.042335,49.235939],[-123.037804,49.235038],[-123.032116,49.23223],[-123.024844,49.232238],[-123.023477,49.232295],[-123.023512,49.229234]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#C2DF2396","stroke_colour":"#440154FF","tooltip":"9330049.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.114775,49.271147],[-123.109757,49.272385],[-123.10537,49.272245],[-123.102926,49.272697],[-123.099934,49.272856],[-123.100736,49.270128],[-123.100888,49.262908],[-123.114779,49.263204],[-123.126619,49.263407],[-123.138563,49.26359],[-123.138469,49.266183],[-123.117416,49.265918],[-123.114891,49.265643],[-123.114775,49.271147]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3E4A8996","stroke_colour":"#440154FF","tooltip":"9330049.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.114775,49.271147],[-123.114891,49.265643],[-123.117416,49.265918],[-123.138469,49.266183],[-123.138411,49.269158],[-123.141079,49.270564],[-123.145484,49.270666],[-123.145065,49.272848],[-123.138784,49.274916],[-123.139837,49.273027],[-123.138992,49.271049],[-123.136606,49.27304],[-123.134571,49.272853],[-123.130507,49.269458],[-123.13067,49.268387],[-123.125637,49.268149],[-123.118767,49.269363],[-123.114775,49.271147]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#287C8E96","stroke_colour":"#440154FF","tooltip":"9330055.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.051722,49.293433],[-123.051972,49.28478],[-123.065509,49.284834],[-123.065384,49.287387],[-123.057004,49.291888],[-123.051722,49.293433]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#32648E96","stroke_colour":"#440154FF","tooltip":"9330010.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.116664,49.219058],[-123.128557,49.219207],[-123.14013,49.219332],[-123.139811,49.226967],[-123.11638,49.226072],[-123.116664,49.219058]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#25858E96","stroke_colour":"#440154FF","tooltip":"9330010.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.116018,49.233596],[-123.11638,49.226072],[-123.139811,49.226967],[-123.139624,49.234344],[-123.116018,49.233596]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3C4F8B96","stroke_colour":"#440154FF","tooltip":"9330017.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.043105,49.229303],[-123.057935,49.229396],[-123.058868,49.232833],[-123.058711,49.239791],[-123.058123,49.241871],[-123.045899,49.236422],[-123.042335,49.235939],[-123.04309,49.234816],[-123.043105,49.229303]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#30688E96","stroke_colour":"#440154FF","tooltip":"9330031.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.101071,49.248771],[-123.115295,49.249049],[-123.115053,49.256913],[-123.101238,49.256579],[-123.100844,49.25438],[-123.101071,49.248771]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#31678E96","stroke_colour":"#440154FF","tooltip":"9330031.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.090155,49.248662],[-123.101071,49.248771],[-123.100844,49.25438],[-123.101238,49.256579],[-123.089835,49.256404],[-123.090155,49.248662]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#433D8596","stroke_colour":"#440154FF","tooltip":"9330034.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.058711,49.239791],[-123.07363,49.240185],[-123.073367,49.248498],[-123.073352,49.248944],[-123.058123,49.241871],[-123.058711,49.239791]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#355F8D96","stroke_colour":"#440154FF","tooltip":"9330034.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.056601,49.250683],[-123.056659,49.244612],[-123.058123,49.241871],[-123.073352,49.248944],[-123.07328,49.251657],[-123.071965,49.252533],[-123.066273,49.25296],[-123.069821,49.256365],[-123.066008,49.256817],[-123.056617,49.25675],[-123.056601,49.250683]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#26AC8196","stroke_colour":"#440154FF","tooltip":"9330045.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.164149,49.274035],[-123.164539,49.268326],[-123.185687,49.268607],[-123.1857,49.273298],[-123.182768,49.272661],[-123.175149,49.271837],[-123.171025,49.271734],[-123.166424,49.272875],[-123.164149,49.274035]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#22A78496","stroke_colour":"#440154FF","tooltip":"9330045.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.164639,49.264041],[-123.185879,49.26437],[-123.185829,49.265247],[-123.185687,49.268607],[-123.164539,49.268326],[-123.164639,49.264041]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#287B8E96","stroke_colour":"#440154FF","tooltip":"9330055.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.052013,49.277472],[-123.056562,49.27747],[-123.065605,49.277522],[-123.065509,49.284834],[-123.051972,49.28478],[-123.052013,49.277472]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3C508B96","stroke_colour":"#440154FF","tooltip":"9330002.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.042326,49.204158],[-123.047312,49.204646],[-123.056445,49.20466],[-123.056845,49.207573],[-123.055387,49.210055],[-123.055121,49.212422],[-123.057876,49.21245],[-123.059173,49.211611],[-123.059362,49.220204],[-123.041281,49.220159],[-123.042326,49.204158]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#44BF7096","stroke_colour":"#440154FF","tooltip":"9330040.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.126708,49.260629],[-123.127211,49.257117],[-123.131803,49.257107],[-123.136308,49.257943],[-123.138794,49.257054],[-123.138697,49.260801],[-123.126708,49.260629]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#1F988B96","stroke_colour":"#440154FF","tooltip":"9330041.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.14598,49.257179],[-123.150769,49.257254],[-123.162662,49.257417],[-123.164927,49.257649],[-123.164639,49.264041],[-123.150544,49.263782],[-123.145757,49.263702],[-123.14598,49.257179]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2A778E96","stroke_colour":"#440154FF","tooltip":"9330043.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.203216,49.258267],[-123.215388,49.258513],[-123.215103,49.265673],[-123.202946,49.265473],[-123.203216,49.258267]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3B508B96","stroke_colour":"#440154FF","tooltip":"9330043.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.185829,49.265247],[-123.185879,49.26437],[-123.186091,49.258021],[-123.203216,49.258267],[-123.202946,49.265473],[-123.185829,49.265247]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#45378296","stroke_colour":"#440154FF","tooltip":"9330006.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.130258,49.208474],[-123.130024,49.214459],[-123.128557,49.219207],[-123.116664,49.219058],[-123.11671,49.217807],[-123.117053,49.210249],[-123.1217,49.20827],[-123.130258,49.208474]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2C728E96","stroke_colour":"#440154FF","tooltip":"9330001.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023537,49.208178],[-123.02314,49.199745],[-123.039876,49.203775],[-123.042326,49.204158],[-123.041281,49.220159],[-123.032391,49.220122],[-123.031974,49.217606],[-123.029988,49.215019],[-123.029704,49.211897],[-123.028074,49.209655],[-123.028015,49.207826],[-123.023537,49.208178]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#44015496","stroke_colour":"#440154FF","tooltip":"9330001.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023537,49.208178],[-123.028015,49.207826],[-123.028074,49.209655],[-123.029704,49.211897],[-123.029988,49.215019],[-123.031974,49.217606],[-123.032391,49.220122],[-123.032244,49.225248],[-123.02348,49.225199],[-123.023653,49.220979],[-123.023537,49.208178]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48207196","stroke_colour":"#440154FF","tooltip":"9330035.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.044156,49.250672],[-123.056601,49.250683],[-123.056617,49.25675],[-123.066008,49.256817],[-123.065916,49.262295],[-123.056591,49.262132],[-123.044314,49.261948],[-123.044156,49.250672]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#22A88496","stroke_colour":"#440154FF","tooltip":"9330039.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.101238,49.256579],[-123.115053,49.256913],[-123.114779,49.263204],[-123.100888,49.262908],[-123.101238,49.256579]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#1F968B96","stroke_colour":"#440154FF","tooltip":"9330039.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.115053,49.256913],[-123.127211,49.257117],[-123.126708,49.260629],[-123.126619,49.263407],[-123.114779,49.263204],[-123.115053,49.256913]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#40478896","stroke_colour":"#440154FF","tooltip":"9330035.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.042164,49.244549],[-123.047122,49.244605],[-123.056659,49.244612],[-123.056601,49.250683],[-123.044156,49.250672],[-123.041616,49.248752],[-123.042164,49.244549]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#36B87896","stroke_colour":"#440154FF","tooltip":"9330050.03"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.077366,49.269649],[-123.077429,49.265175],[-123.081592,49.265262],[-123.089053,49.266692],[-123.089135,49.262482],[-123.100888,49.262908],[-123.100736,49.270128],[-123.099934,49.272856],[-123.081661,49.269699],[-123.077366,49.269649]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#44388296","stroke_colour":"#440154FF","tooltip":"9330016.04"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023558,49.244428],[-123.023456,49.234325],[-123.031849,49.238241],[-123.037758,49.240698],[-123.047122,49.244605],[-123.042164,49.244549],[-123.034091,49.244513],[-123.023558,49.244428]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#238A8D96","stroke_colour":"#440154FF","tooltip":"9330037.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.089835,49.256404],[-123.089209,49.25794],[-123.089135,49.262482],[-123.077481,49.262392],[-123.077479,49.258485],[-123.075806,49.256595],[-123.075881,49.256221],[-123.089835,49.256404]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#26838E96","stroke_colour":"#440154FF","tooltip":"9330037.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.066008,49.256817],[-123.069821,49.256365],[-123.075806,49.256595],[-123.077479,49.258485],[-123.077481,49.262392],[-123.065916,49.262295],[-123.066008,49.256817]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#46327F96","stroke_colour":"#440154FF","tooltip":"9330053.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.026103,49.293012],[-123.02645,49.290783],[-123.029955,49.287711],[-123.030854,49.285619],[-123.03077,49.277432],[-123.044106,49.277465],[-123.052013,49.277472],[-123.051972,49.28478],[-123.051722,49.293433],[-123.047394,49.293764],[-123.04427,49.292146],[-123.040516,49.292075],[-123.039002,49.29087],[-123.031739,49.290422],[-123.027945,49.292808],[-123.026103,49.293012]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#30688E96","stroke_colour":"#440154FF","tooltip":"9330003.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.072028,49.214578],[-123.091048,49.214816],[-123.090942,49.218274],[-123.080058,49.218152],[-123.072021,49.218093],[-123.072028,49.214578]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#39568C96","stroke_colour":"#440154FF","tooltip":"9330003.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.070988,49.207551],[-123.076259,49.208282],[-123.09126,49.205299],[-123.091048,49.214816],[-123.072028,49.214578],[-123.070988,49.207551]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#433E8596","stroke_colour":"#440154FF","tooltip":"9330006.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.130258,49.208474],[-123.140534,49.208535],[-123.14013,49.219332],[-123.128557,49.219207],[-123.130024,49.214459],[-123.130258,49.208474]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#365C8D96","stroke_colour":"#440154FF","tooltip":"9330007.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.140852,49.201914],[-123.147423,49.204541],[-123.150727,49.205348],[-123.156925,49.210478],[-123.163544,49.213588],[-123.168237,49.21446],[-123.167988,49.216153],[-123.168416,49.225789],[-123.165608,49.225045],[-123.162763,49.223066],[-123.159679,49.222316],[-123.158038,49.219598],[-123.14013,49.219332],[-123.140534,49.208535],[-123.140852,49.201914]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#40468896","stroke_colour":"#440154FF","tooltip":"9330007.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.14013,49.219332],[-123.158038,49.219598],[-123.159679,49.222316],[-123.162763,49.223066],[-123.165608,49.225045],[-123.168416,49.225789],[-123.167431,49.227316],[-123.139811,49.226967],[-123.14013,49.219332]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2F6B8E96","stroke_colour":"#440154FF","tooltip":"9330053.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.023404,49.277558],[-123.03077,49.277432],[-123.030854,49.285619],[-123.029955,49.287711],[-123.02645,49.290783],[-123.026103,49.293012],[-123.023086,49.293495],[-123.023404,49.277558]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3F498996","stroke_colour":"#440154FF","tooltip":"9330054.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.056604,49.269553],[-123.065769,49.269561],[-123.065622,49.276646],[-123.065605,49.277522],[-123.056562,49.27747],[-123.056604,49.269553]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48267696","stroke_colour":"#440154FF","tooltip":"9330054.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.044217,49.269576],[-123.056604,49.269553],[-123.056562,49.27747],[-123.052013,49.277472],[-123.044106,49.277465],[-123.044217,49.269576]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#22A78596","stroke_colour":"#440154FF","tooltip":"9330056.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.065384,49.287387],[-123.065509,49.284834],[-123.065605,49.277522],[-123.065622,49.276646],[-123.077265,49.27676],[-123.0771,49.281344],[-123.077995,49.284397],[-123.077925,49.287233],[-123.077161,49.289555],[-123.069802,49.288004],[-123.068577,49.286584],[-123.065384,49.287387]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#24888E96","stroke_colour":"#440154FF","tooltip":"9330056.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.065769,49.269561],[-123.077366,49.269649],[-123.077265,49.27676],[-123.065622,49.276646],[-123.065769,49.269561]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2B748E96","stroke_colour":"#440154FF","tooltip":"9330057.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.099782,49.276758],[-123.099687,49.281347],[-123.093427,49.281238],[-123.093627,49.276673],[-123.099782,49.276758]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2E6E8E96","stroke_colour":"#440154FF","tooltip":"9330057.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.0771,49.281344],[-123.077265,49.27676],[-123.077366,49.269649],[-123.081661,49.269699],[-123.099934,49.272856],[-123.099782,49.276758],[-123.093627,49.276673],[-123.093427,49.281238],[-123.081305,49.280967],[-123.0771,49.281344]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#76D15396","stroke_colour":"#440154FF","tooltip":"9330059.06"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.099738,49.28651],[-123.09907,49.285058],[-123.099687,49.281347],[-123.099782,49.276758],[-123.102139,49.277123],[-123.102155,49.279286],[-123.106113,49.279457],[-123.105595,49.28071],[-123.109758,49.281458],[-123.111922,49.282764],[-123.110919,49.284708],[-123.108823,49.284311],[-123.108698,49.286317],[-123.105718,49.286359],[-123.102213,49.285319],[-123.099738,49.28651]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#54C66796","stroke_colour":"#440154FF","tooltip":"9330060.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.136304,49.283712],[-123.133353,49.281806],[-123.13713,49.279284],[-123.138773,49.278796],[-123.140852,49.280907],[-123.136304,49.283712]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3DBC7496","stroke_colour":"#440154FF","tooltip":"9330060.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.133353,49.281806],[-123.129183,49.279078],[-123.132468,49.276993],[-123.136187,49.275751],[-123.136384,49.276935],[-123.138773,49.278796],[-123.13713,49.279284],[-123.133353,49.281806]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#297A8E96","stroke_colour":"#440154FF","tooltip":"9330004.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.101888,49.218467],[-123.102458,49.204924],[-123.10156,49.204085],[-123.113506,49.204761],[-123.117028,49.203875],[-123.117053,49.210249],[-123.11671,49.217807],[-123.106122,49.217726],[-123.106116,49.218567],[-123.101888,49.218467]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2E6D8E96","stroke_colour":"#440154FF","tooltip":"9330004.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.09126,49.205299],[-123.097901,49.204185],[-123.10156,49.204085],[-123.102458,49.204924],[-123.101888,49.218467],[-123.090942,49.218274],[-123.091048,49.214816],[-123.09126,49.205299]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#5AC86496","stroke_colour":"#440154FF","tooltip":"9330047.02"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.150389,49.268082],[-123.157502,49.268187],[-123.157281,49.273872],[-123.15562,49.273637],[-123.152623,49.277625],[-123.149784,49.277904],[-123.152519,49.27464],[-123.152602,49.272549],[-123.150223,49.272514],[-123.150389,49.268082]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#35B77996","stroke_colour":"#440154FF","tooltip":"9330046.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.150544,49.263782],[-123.164639,49.264041],[-123.164539,49.268326],[-123.157502,49.268187],[-123.150389,49.268082],[-123.150544,49.263782]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#B0DD2E96","stroke_colour":"#440154FF","tooltip":"9330059.10"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.123274,49.275247],[-123.129183,49.279078],[-123.126038,49.281195],[-123.120094,49.277348],[-123.123274,49.275247]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#1F978B96","stroke_colour":"#440154FF","tooltip":"9330050.04"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.077481,49.262392],[-123.089135,49.262482],[-123.089053,49.266692],[-123.081592,49.265262],[-123.077429,49.265175],[-123.077481,49.262392]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#66CC5D96","stroke_colour":"#440154FF","tooltip":"9330061.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.143602,49.287033],[-123.141822,49.28727],[-123.136304,49.283712],[-123.140852,49.280907],[-123.143735,49.284743],[-123.143602,49.287033]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#228D8D96","stroke_colour":"#440154FF","tooltip":"9330062.00"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.138616,49.28938],[-123.141822,49.28727],[-123.143602,49.287033],[-123.143773,49.288511],[-123.146541,49.290011],[-123.143432,49.292385],[-123.138616,49.28938]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#3D4C8A96","stroke_colour":"#440154FF","tooltip":"9330013.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.071762,49.225219],[-123.08005,49.225331],[-123.090711,49.225443],[-123.090549,49.232918],[-123.074292,49.232629],[-123.071514,49.23263],[-123.071762,49.225219]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#94D84196","stroke_colour":"#440154FF","tooltip":"9330040.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.126708,49.260629],[-123.138697,49.260801],[-123.138563,49.26359],[-123.126619,49.263407],[-123.126708,49.260629]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#47C06F96","stroke_colour":"#440154FF","tooltip":"9330041.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.138794,49.257054],[-123.14598,49.257179],[-123.145757,49.263702],[-123.138563,49.26359],[-123.138697,49.260801],[-123.138794,49.257054]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#1F978B96","stroke_colour":"#440154FF","tooltip":"9330047.01"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-123.157502,49.268187],[-123.164539,49.268326],[-123.164149,49.274035],[-123.160696,49.274403],[-123.157281,49.273872],[-123.157502,49.268187]]]}}}],"polygon-defaultLayerId",[],false,"#AAFFFFFF",{"fill_colour":[false]},[[-123.2242208,49.1985349],[-123.023086,49.3140785]],true,false,null,false,1,null]}]},"evals":[],"jsHooks":[]}</script>
+
+---
+class: medium-code
+
+# Pinpointed region selection
+
+```r
+regions=list(CSD=c("5915022","5915803"),CT=c("9330069.01","9330069.02"))
+get_census('CA16', regions, vectors=c(toddlers="v_CA16_7"), geo_format='sf', level='DA') %&gt;%
+  ggplot(aes(fill=toddlers/`Shape Area`/247.11)) + 
+  geom_sf(size=0.1) + geom_water() + geom_roads() +
+  scale_fill_viridis_c(trans="log",labels=function(x)round(x,2),name="Toddlers per acre\n(log scale)") +
+  coord_sf(datum=NA) 
+```
+
+![](van_gis_user_group_files/figure-html/toddler-density-1.svg)&lt;!-- --&gt;
+---
+class: medium-code, short-title
+
+# Chinese languages in Vancouver
+
+
+
+```r
+languages &lt;- c(Mandarin="v_CA16_1259",Cantonese="v_CA16_1253")
+language_data &lt;- get_census('CA16', regions, level='DA', vectors=languages)
+get_census('CA16', regions, geo_format='sf', level='DB') %&gt;%
+  proportional_reaggregate(.,language_data,c("DA_UID"="GeoUID"),names(languages),base="Population") %&gt;%
+  dotdensity::compute_dots(., categories = names(languages),scale=10) %&gt;%
+  ggplot() + geom_sf(aes(color=Category),size=0.1,alpha=0.75,show.legend = "point") +
+  language_theme + coord_sf(datum=NA)
+```
+
+![](van_gis_user_group_files/figure-html/mandarin-cantonese-1.svg)&lt;!-- --&gt;
+---
+
+# Census timelines
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+The higher frequency tables (CANSIM) split the timelines along census geographies, with overlap to facilitate splicing them together.
+
+A better way to do this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).]
+.pull-right[
+&lt;img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;"&gt;
+]
+
+---
+class: medium-code
+# Tongfen
+
+```r
+meta &lt;- meta_for_ca_census_vectors(c(seniors_CA16="v_CA16_2522",seniors_CA06="v_CA06_92")) %&gt;%
+  bind_rows(meta_for_additive_variables(c("CA16","CA06"),"Population"))
+seniors_data &lt;- get_tongfen_ca_census(list(CMA="59935"), meta, level="DA") %&gt;%
+  mutate(change=seniors_CA16/Population_CA16-seniors_CA06/Population_CA06) %&gt;%
+  mutate(c=mountainmathHelpers::pretty_cut(change,c(-Inf,seq(-0.2,0.2,0.05),Inf),format=scales::percent))
+ggplot(seniors_data,aes(fill=c)) +
+  geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
+  coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  labs(title="Victoria percentage point change in seniors 2006-2016", fill=NULL)
+```
+
+![](van_gis_user_group_files/figure-html/unnamed-chunk-9-1.svg)&lt;!-- --&gt;
+
+
+---
+# TongFen with T1FF data
+
+```r
+years &lt;- seq(2004,2018)
+variables &lt;- setNames(c(paste0("v_TX",years,"_607"),paste0("v_TX",years,"_786")),
+                      c(paste0("families_",years),paste0("lico_",years)))
+meta &lt;-meta_for_ca_census_vectors(variables)
+
+low_income &lt;- get_tongfen_ca_census(regions = list(CMA=59933), meta=meta, level="CT") %&gt;%
+  mutate(`2004-2018`=lico_2018/families_2018-lico_2004/families_2004,
+         `2004-2011`=lico_2011/families_2011-lico_2004/families_2004,
+         `2011-2018`=lico_2018/families_2018-lico_2011/families_2011)
+```
+--
+
+```r
+head(meta)
+```
+
+```
+## # A tibble: 6 x 10
+##   variable     label         dataset type     aggregation units  rule     parent geo_dataset  year
+##   &lt;chr&gt;        &lt;chr&gt;         &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;       &lt;chr&gt;  &lt;chr&gt;    &lt;lgl&gt;  &lt;chr&gt;       &lt;int&gt;
+## 1 v_TX2004_607 families_2004 TX2004  Original Additive    Number Additive NA     CA01         2004
+## 2 v_TX2005_607 families_2005 TX2005  Original Additive    Number Additive NA     CA01         2005
+## 3 v_TX2006_607 families_2006 TX2006  Original Additive    Number Additive NA     CA06         2006
+## 4 v_TX2007_607 families_2007 TX2007  Original Additive    Number Additive NA     CA06         2007
+## 5 v_TX2008_607 families_2008 TX2008  Original Additive    Number Additive NA     CA06         2008
+## 6 v_TX2009_607 families_2009 TX2009  Original Additive    Number Additive NA     CA06         2009
+```
+
+---
+# Low income families from T1FF data
+
+```r
+low_income %&gt;% pivot_longer(starts_with("20")) %&gt;% st_sf() %&gt;%
+  ggplot(aes(fill=value)) + facet_wrap("name") +
+  geom_sf(size=0.1) + scale_fill_gradient2(labels=scales::percent) +
+  coord_sf(datum=NA,xlim=c(-123.25,-122.8),ylim=c(49.1,49.35)) +
+  labs(title="Change in low share of families in low income 2004-2018", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+![](van_gis_user_group_files/figure-html/unnamed-chunk-12-1.svg)&lt;!-- --&gt;
+
+---
+
+background-image: url("https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time_files/figure-html/vancouver_income_map-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Maps, graphs and text
+
+## [Reproducible documents](https://doodles.mountainmath.ca/blog/2018/10/28/understanding-income-distributions-across-geographies-and-time/)
+
+
+---
+
+
+background-image: url("https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation_files/figure-html/vancouver_d_index-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Iterating
+## [With each analysis we gain insight, but also gain ability to ask better questions. And iterate by adapting the code for previous analysis to go deeper. Reproducible and adaptable workflows facilitate this.](https://doodles.mountainmath.ca/blog/2020/09/21/income-mixing-and-segregation/)
+
+
+---
+
+# Script-based workflows (vs Desktop GIS)
+Script-based workflows work well for many applications. But Desktop GIS works better in others. And distinction is not sharp, Desktop GIS can also integrate scripts.
+
+.pull-left[
+### Pros
+* Maps are just one part of analysis, R allows easy mixing of multiple tools, including maps.
+* Can integrate analysis directly into report, self-contained documents with option to output in various formats (PDF, html, ...). In fact, this presentation
+ [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/van_gis_user_group.Rmd).
+* Adaptable, can easily piggy-pack of previous workflows. Or off of work that others have done.
+* Can do deeper (spatial) analysis. (Spatial models, ecological inference, ...)
+]
+.pull-right[
+### Cons
+* Editing shapes and other manual manipulations are cumbersome.
+* Hard to do *cartography*, once one goes beyond basic map styling and annotations things get cumbersome fast.
+* Higher barrier of entry.
+]
+--
+
+.center[**You can use both!**]
+
+--
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:10",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

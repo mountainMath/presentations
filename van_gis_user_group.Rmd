@@ -1,0 +1,347 @@
+---
+title: "Canadian census data using R"
+subtitle: "Reproducible and adaptable workflows"
+author: "Jens von Bergmann"
+date: "2020/10/14"
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      ratio: '16:10'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	dev="svg"
+)
+options(htmltools.dir.version = FALSE)
+library(tidyverse)
+library(cancensus)
+library(tongfen)
+options(servr.daemon = TRUE)
+```
+
+## Overview
+We will showcase how to access and analyze Canadian census data using R. Using a case study of analyzing how select census variables have changed through time, we will show how to
+
+1. get pinpointed access to census data for just the variables, geographies and census years we need
+2. make census data comparable across census years
+3. run analysis and map the results
+4. adapt the code to re-run the analysis for a different geographic region or using a different set of variables.
+
+The goal is to highlight the strengths and limitations to a 100% script-based workflow. The presentation will require some familiarity with census data, geographies and geospatial analysis, but won’t assume prior exposure to R.
+
+
+---
+# Tools
+Both **R** and **python** make reproducible analysis fairly straight forward. SPSS, SAS, Matlab could also be used, but tend to be more limited in being able to implement a fully reproducible pipeline.
+
+In this talk we will focus on the [*R* programming language](https://www.r-project.org). 
+
+The [RStudio IDE](https://rstudio.com) has a user-friendly interface, and [RMarkdown](https://bookdown.org/yihui/rmarkdown/notebook.html) documents offer a way to seamlessly integrate our entire reproducible pipeline, all the way from data acquisition to presentation of results.
+
+---
+### RMarkdown
+RMarkdown allows mixing of code and text. Analysis, visualization and report are all one and the same document. 
+
+.pull-left[
+```{r fig.height=2.5, fig.width=3}
+library(tidyverse)
+data(mtcars)
+ggplot(mtcars,aes(x=mpg)) + 
+  geom_histogram(binwidth=4)
+```
+]
+.pull-right[
+<img src="images/open_rmarkdown3.png" style="height:300px;">
+
+RMarkdown documents can be compiled to **HTML**, **PDF** or **Word**.
+]
+
+The output of code blocks gets inserted into the document. We can show or hide the actual code.
+
+---
+# Data acquisition and processing
+For this talk we will use the following packages:
+  - [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+  - [`tongfen` package](https://mountainmath.github.io/tongfen/) to work with data across multiple census years
+  - [`sf` package](https://r-spatial.github.io/sf/index.html) for basic geospatial operations
+
+Generally, we will be working in the [`tidyverse` package](https://www.tidyverse.org), an *opinionated collection of R packages* for intuitive general-purpose data manipulations and visualization capabilities. These four packages is (almost) all that's needed for this talk.
+
+```{r}
+library(tidyverse)
+library(cancensus)
+library(tongfen)
+library(sf)
+```
+
+---
+## Census data
+Census data offers much richer variables and spatial resolution, but at coarse time intervals.
+
+Richer data comes at a price: Data discovery and acquisition can be complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a quick tour of CensusMapper...
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/maps/731" target="_blank">CensusMapper Demo</a>
+
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
+---
+# Maps aren't analysis
+Maps are only one element in the toolbox to communicate the result of analysis. We usually present maps to complement a range of other visuals and other analysis results.
+
+How does the net migration effect the age distribution in each municipality? 
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+age_pyramid_styling <- list(
+  scale_x_discrete(breaks=c(seq(0, 100, 5),"100+")),
+  scale_y_continuous(labels = scales::comma),
+  coord_flip(),
+  scale_fill_brewer(palette = "Set1"),
+  theme_bw(),
+  labs(caption="StatCan 2016 census"))
+```
+```{r canada_age, fig.height=3.2, fig.width=10, message=FALSE, warning=FALSE, dev='svg'}
+cancensusHelpers::get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %>%
+  ggplot(aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") + age_pyramid_styling
+```
+
+--
+
+How to get the data to easily make these graphs?
+
+???
+Explain how net migration patterns lead to different age distributions.
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), and ideally install it in your `.Rprofile` so it's always available and won't expose your API key when sharing code.
+]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;">
+]
+
+---
+background-image: url("images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/api" target="_blank">CensusMapper API Demo</a>
+
+---
+class: medium-code
+## Census data
+```{r fig.height=4, fig.width=10, message=FALSE, warning=FALSE}
+get_census("CA16",regions=list(CMA="59935"),geo_format="sf",level="CT",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719")) %>%
+  ggplot(aes(fill=movers/base)) +
+  geom_sf(size=0.1) + coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Victoria share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+```
+
+---
+class: medium-code
+## Census data
+```{r fig.height=4, fig.width=10, message=FALSE, warning=FALSE}
+data <- get_census("CA16",regions=list(CMA="59933"),geo_format="sf",level="CT",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719"))
+g <- ggplot(data,aes(fill=movers/base)) + 
+  geom_sf(size=0.1) + coord_sf(datum = NA,ylim=c(49.15,49.4),xlim=c(-123.4,-122.7)) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Vancouver share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+g
+```
+---
+## Add minimal styling
+```{r fig.height=4, fig.width=10, message=FALSE, warning=FALSE}
+library(mountainmathHelpers)
+g +
+  geom_water() +
+  geom_roads(color="white") +
+  coord_sf(datum = NA,ylim=c(49.15,49.4),xlim=c(-123.4,-122.7)) 
+```
+
+---
+## Interactive maps
+
+```{r fig.height=5, fig.width=10, message=FALSE, warning=FALSE}
+library(mapdeck)
+mapdeck(token = getOption("mapbox_token"), style = mapdeck_style('dark')) %>%
+  add_sf(data = data %>% mutate(share=movers/base) %>% filter(CSD_UID=="5915022") %>% 
+           rmapshaper::ms_simplify(keep = 0.2) %>% select(GeoUID,share), 
+              tooltip = "GeoUID", fill_opacity=150, fill_colour="share")
+```
+
+---
+class: medium-code
+
+# Pinpointed region selection
+```{r toddler-density, echo=TRUE, fig.height=4}
+regions=list(CSD=c("5915022","5915803"),CT=c("9330069.01","9330069.02"))
+get_census('CA16', regions, vectors=c(toddlers="v_CA16_7"), geo_format='sf', level='DA') %>%
+  ggplot(aes(fill=toddlers/`Shape Area`/247.11)) + 
+  geom_sf(size=0.1) + geom_water() + geom_roads() +
+  scale_fill_viridis_c(trans="log",labels=function(x)round(x,2),name="Toddlers per acre\n(log scale)") +
+  coord_sf(datum=NA) 
+```
+---
+class: medium-code, short-title
+
+# Chinese languages in Vancouver
+```{r include=FALSE}
+language_theme <- list(
+  geom_roads(color="grey"),
+  geom_water(fill = "#202040"),
+  scale_color_manual(values=c("Mandarin"="#ff4444","Cantonese"="#4444ff"),name="1 dot = 10 people"),
+  theme(panel.background = element_rect(fill = 'black'),legend.key = element_rect(fill = 'black')),
+  guides(colour = guide_legend(override.aes = list(size=2)))
+)
+```
+
+```{r mandarin-cantonese, echo=TRUE, fig.height=4, fig.width=8}
+languages <- c(Mandarin="v_CA16_1259",Cantonese="v_CA16_1253")
+language_data <- get_census('CA16', regions, level='DA', vectors=languages)
+get_census('CA16', regions, geo_format='sf', level='DB') %>%
+  proportional_reaggregate(.,language_data,c("DA_UID"="GeoUID"),names(languages),base="Population") %>%
+  dotdensity::compute_dots(., categories = names(languages),scale=10) %>%
+  ggplot() + geom_sf(aes(color=Category),size=0.1,alpha=0.75,show.legend = "point") +
+  language_theme + coord_sf(datum=NA)
+```
+---
+
+# Census timelines
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+The higher frequency tables (CANSIM) split the timelines along census geographies, with overlap to facilitate splicing them together.
+
+A better way to do this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code
+# Tongfen
+```{r fig.height=3.5, fig.width=10}
+meta <- meta_for_ca_census_vectors(c(seniors_CA16="v_CA16_2522",seniors_CA06="v_CA06_92")) %>%
+  bind_rows(meta_for_additive_variables(c("CA16","CA06"),"Population"))
+seniors_data <- get_tongfen_ca_census(list(CMA="59935"), meta, level="DA") %>%
+  mutate(change=seniors_CA16/Population_CA16-seniors_CA06/Population_CA06) %>%
+  mutate(c=mountainmathHelpers::pretty_cut(change,c(-Inf,seq(-0.2,0.2,0.05),Inf),format=scales::percent))
+ggplot(seniors_data,aes(fill=c)) +
+  geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
+  coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  labs(title="Victoria percentage point change in seniors 2006-2016", fill=NULL)
+```
+
+
+---
+# TongFen with T1FF data
+```{r}
+years <- seq(2004,2018)
+variables <- setNames(c(paste0("v_TX",years,"_607"),paste0("v_TX",years,"_786")),
+                      c(paste0("families_",years),paste0("lico_",years)))
+meta <-meta_for_ca_census_vectors(variables)
+
+low_income <- get_tongfen_ca_census(regions = list(CMA=59933), meta=meta, level="CT") %>%
+  mutate(`2004-2018`=lico_2018/families_2018-lico_2004/families_2004,
+         `2004-2011`=lico_2011/families_2011-lico_2004/families_2004,
+         `2011-2018`=lico_2018/families_2018-lico_2011/families_2011)
+```
+--
+```{r}
+head(meta)
+```
+
+---
+# Low income families from T1FF data
+```{r fig.height=3.5, fig.width=11}
+low_income %>% pivot_longer(starts_with("20")) %>% st_sf() %>%
+  ggplot(aes(fill=value)) + facet_wrap("name") +
+  geom_sf(size=0.1) + scale_fill_gradient2(labels=scales::percent) +
+  coord_sf(datum=NA,xlim=c(-123.25,-122.8),ylim=c(49.1,49.35)) +
+  labs(title="Change in low share of families in low income 2004-2018", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+---
+
+background-image: url("https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time_files/figure-html/vancouver_income_map-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Maps, graphs and text
+
+## [Reproducible documents](https://doodles.mountainmath.ca/blog/2018/10/28/understanding-income-distributions-across-geographies-and-time/)
+
+
+---
+
+
+background-image: url("https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation_files/figure-html/vancouver_d_index-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Iterating
+## [With each analysis we gain insight, but also gain ability to ask better questions. And iterate by adapting the code for previous analysis to go deeper. Reproducible and adaptable workflows facilitate this.](https://doodles.mountainmath.ca/blog/2020/09/21/income-mixing-and-segregation/)
+
+
+---
+
+# Script-based workflows (vs Desktop GIS)
+Script-based workflows work well for many applications. But Desktop GIS works better in others. And distinction is not sharp, Desktop GIS can also integrate scripts.
+
+.pull-left[
+### Pros
+* Maps are just one part of analysis, R allows easy mixing of multiple tools, including maps.
+* Can integrate analysis directly into report, self-contained documents with option to output in various formats (PDF, html, ...). In fact, this presentation
+ [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/van_gis_user_group.Rmd).
+* Adaptable, can easily piggy-pack of previous workflows. Or off of work that others have done.
+* Can do deeper (spatial) analysis. (Spatial models, ecological inference, ...)
+]
+.pull-right[
+### Cons
+* Editing shapes and other manual manipulations are cumbersome.
+* Hard to do *cartography*, once one goes beyond basic map styling and annotations things get cumbersome fast.
+* Higher barrier of entry.
+]
+--
+
+.center[**You can use both!**]
+
+--
