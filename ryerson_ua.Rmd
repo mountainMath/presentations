@@ -1,0 +1,590 @@
+---
+title: "Fetching, visualizing, and analyzing Statistics Canada’s data using R"
+subtitle: "Ryerson Urban Analytics Institute"
+author: "Jens von Bergmann"
+date: '2020-10-19'
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      ratio: '16:10'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	dev = "svg"
+)
+options(htmltools.dir.version = FALSE)
+options(servr.daemon = TRUE)
+library(tidyverse)
+```
+
+
+## Fetching, visualizing, and analyzing Statistics Canada’s data using R
+Slides are at https://mountainmath.ca/ryerson_ua for those wanting to follow along and copy-paste code on their own machine.
+
+--
+* **Fetching**: How do we find/discover and import the data we need in an effective and efficient way?
+
+--
+* **Analyzing**: Data wrangling, understanding and analyzing (mostly descriptive for this talk) the data.
+
+--
+* **Visualizing**: Communicate results of our analysis. (Fetching, analyzing and visualizing form a cycle that we iterate on.)
+
+--
+* **StatCan data**: For this talk this means regular StatCan tables (former CANSIM) and census data (we won't look at other StatCan data like PUMF).
+
+--
+* **R**: The [*R* programming language](https://www.r-project.org). Ideally using the [RStudio IDE](https://rstudio.com). We will be working with [RMarkdown](https://bookdown.org/yihui/rmarkdown/notebook.html) documents, and need the following packages:
+  - [`cansim` package](https://mountainmath.github.io/cansim/) to access census data via the [StatCan NDM API](https://www.statcan.gc.ca/eng/developers/wds)
+  - [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+  - [`tongfen` package](https://mountainmath.github.io/tongfen/) to work with data across multiple census years
+  - additionally, we will be working in the [tidyverse](https://www.tidyverse.org), an *opinionated collection of R packages* for intuitive general-purpose data manipulations and visualization capabilities.
+
+
+---
+## Required packages (and API key)
+
+Time to get started in earnest.
+
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)
+#install.packages(c("cansim","cancensus"))
+library(cansim)
+library(cancensus)
+#remotes::install_github("mountainmath/tongfen")
+library(tongfen)
+```
+
+A slight complication, the `cancensus` package needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), but for today everyone who does not have one already is welcome to use a temporary API key:
+
+```{r}
+options(cancensus.api_key='CensusMapper_a9d50fe058e2f43ec6a2aa1f569a82fa')
+```
+
+This API key will expire later today, for future use replace it with your own and put this line into your `.Rprofile` file, that way it's available in every R session and you won't expose your API key when sharing code. 
+
+---
+# cansim
+.pull-left[
+The [`cansim` R package](https://mountainmath.github.io/cansim/) interfaces with the StatCan NDM that replaces the former CANSIM tables. It can be queried for
+- whole tables
+- specific vectors
+- data discovery searching through tables
+
+It encodes the metadata and allows to work with the internal hierarchical structure of the fields.
+]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/cansim/master/images/cansim-sticker.png" alt="cansim" style="height:500px;margin-top:-80px;">
+]
+
+---
+## First example: Motor vehicle sales
+To start off we grab data on motor vehicle sales from table 20-10-0001 and inspect the available variables.
+
+```{r}
+mv_sales <- get_cansim("20-10-0001") %>%
+  normalize_cansim_values(factors=TRUE)
+
+mv_sales %>% select_if(is.factor) %>% sapply(levels)
+```
+
+---
+## Motor vehicle sales (Notes)
+It's always good to check the notes so there are no unexpected hiccups.
+.medium-font[
+```{r}
+mv_notes <- get_cansim_table_notes("20-10-0001")
+knitr::kable(mv_notes)
+```
+]
+
+--
+
+We take note of the definition for **Trucks** and that **seasonally adjusted** data has been discontinued.
+
+---
+## Motor vehicle sales
+```{r fig.height=3, fig.width=8}
+plot_data <- mv_sales %>% 
+  filter(GEO=="Canada",
+         `Vehicle type`!="Total, new motor vehicles",
+         `Origin of manufacture`=="Total, country of manufacture",
+         Sales=="Units",
+         `Seasonal adjustment`=="Unadjusted")
+
+ggplot(plot_data,aes(x=Date,y=VALUE,color=`Vehicle type`)) +
+  geom_line() 
+```
+
+---
+## Motor vehicle sales (nicer graph)
+```{r fig.height=3, fig.width=8}
+g<- plot_data %>% filter(Date>=as.Date("1990-01-01")) %>% 
+  ggplot(aes(x=Date,y=VALUE,color=`Vehicle type`)) +
+  theme_light() +
+  geom_line(alpha=0.2) + 
+  geom_smooth(span=0.1) + 
+  scale_y_continuous(labels=function(d)scales::comma(d,scale=1/1000,suffix="k")) +
+  labs(title="Canadian new motor vehicle sales",x=NULL,y="Sales per month",
+       caption="StatCan Table 20-10-0001")
+g
+```
+
+
+---
+class: medium-code
+## Motor vehicle sales (annotated graph, final version)
+```{r fig.height=4, fig.width=8}
+library(ggrepel)   # (for nicer labels)
+g + geom_text_repel(data=~filter(.,Date==as.Date("1990-08-01"),`Vehicle type`=="Passenger cars"),
+                   label="Passenger cars",show.legend = FALSE,hjust=0,nudge_y = 30000) +
+  geom_text_repel(data=~filter(.,Date==as.Date("2016-11-01"),`Vehicle type`=="Trucks"),
+                   label="Trucks, SUVs, Vans, Buses",show.legend = FALSE,
+                  hjust=1,nudge_x = -2000,nudge_y=10000) +
+  scale_color_manual(values=c("Passenger cars"="steelblue","Trucks"="brown"),guide=FALSE)
+```
+
+---
+## Motor vehicle sales (STL decomposition)
+```{r fig.height=4, fig.width=8}
+plot_data %>% filter(Date>=as.Date("1990-01-01")) %>% rename(type=`Vehicle type`) %>%
+  ggseas::ggsdc(aes(x=Date,y=VALUE,color=type),method="stl",frequency = 12,s.window = 24) +
+  theme_light() + geom_line() + 
+  scale_color_manual(values=c("Passenger cars"="steelblue","Trucks"="brown"),guide=FALSE) +     
+  scale_y_continuous(labels=function(d)scales::comma(d,scale=1/1000,suffix="k")) +
+  labs(title="Canadian new motor vehicle sales (STL decomposition)",x=NULL,y="Sales per month",
+       colour = "Vehicle type",caption="StatCan Table 20-10-0001")
+```
+
+---
+## Cigarette sales
+.pull-left[
+Sometimes we are just interested in one specific variable. It can be easier to pull in the StatCan vector.
+
+Vector discovery can be cumbersome, downloaded table data has it. The web view has it too.
+
+We can go to the web view of table right from the R console using the following command.
+
+```{r eval=FALSE}
+view_cansim_webpage("16-10-0044")
+```
+
+Selecting the **Add/Remove data** option allows us to filter the data down to what we want and enable the display of StatCan vectors.
+]
+
+
+.pull-right[
+![](images/cigarette_sales.png)
+]
+---
+class: medium-code
+## Cigarette sales
+```{r fig.height=4, fig.width=8}
+g<-get_cansim_vector("v28536414","1800-01-01") %>% 
+  normalize_cansim_values() %>%
+  ggplot(aes(x=Date,y=VALUE)) +
+  geom_line() + 
+  scale_y_continuous(labels=function(d)scales::comma(d,scale=1E-9,suffix = "M")) +
+  geom_smooth(span=0.25,se=FALSE) +
+  labs(title="Canadian cigarette sales",x=NULL,y="Monthly sales",caption="StatCan vector v28536414")
+g
+```
+
+
+---
+class: medium-code
+## Cigarette sales (adding context)
+```{r fig.height=4, fig.width=8}
+g +
+  geom_vline(xintercept = as.Date(c("2005-03-18","2005-08-22","2006-05-31","2006-12-01",
+                                    "2007-01-01","2007-06-17","2010-07-05","2012-02-22")),
+             linetype="dashed", color="brown") +
+  geom_label(x=as.Date("2010-01-01"),y=3.3E9,label="partial smoking bans\nand advertising limitations", 
+            hjust=0.5,color="brown") +
+  geom_label(x=as.Date("2020-03-01"),y=2.5E9, label="No visible impact\nof COVID-19 (yet)", hjust=0.8)
+```
+
+---
+class: medium-code
+## Housing consumption share of GDP
+Sometimes we need more data processing to get to quantities we are interested in. One frequent pattern is that we want to look at percent shares of a total.
+
+```{r}
+gdp_data <- get_cansim("36-10-0402") %>% 
+  normalize_cansim_values() %>%
+  filter(Value=="Chained (2012) dollars") %>%
+  select(Date,GEO,naics=`North American Industry Classification System (NAICS)`,VALUE) %>%
+  left_join(filter(.,grepl("T001",naics)) %>% select(Date,GEO,Total=VALUE)) 
+
+gdp_data %>% filter(grepl("5311",naics)) %>% pull(naics) %>% unique
+```
+
+Here we cut down to Chained (2012) dollars and joined the **Total** GDP as another column, and we check that NAICS sub-codes starting with **5311** correspond to housing consumption.
+
+--
+
+```{r}
+housing_consumption <- gdp_data %>% 
+  filter(grepl("5311",naics)) %>%
+  group_by(Date,GEO) %>%
+  summarize(Share=sum(VALUE)/first(Total)) %>%
+  mutate(highlight=GEO %in% c("British Columbia","Alberta","Ontario","Quebec"))
+```
+
+We compute the combined share of those two categories for each Date and Geography.
+
+---
+class: medium-code
+## Housing consumption share of GDP
+```{r fig.height=4, fig.width=8}
+ggplot(housing_consumption,aes(x=Date,y=Share,group=GEO)) +
+  geom_line(data=~filter(.,!highlight),color="grey") + 
+  geom_line(data=~filter(.,highlight),aes(color=GEO)) +
+  theme_light() + scale_y_continuous(labels=scales::percent) +
+  labs(title="Housing consumption as share of GDP",caption="StatCan Table 36-10-0402",fill=NULL,x=NULL)
+```
+
+
+
+---
+class: medium-code
+## Data discovery
+Data discovery is still a major issue. Right now we have two ways
+
+* Google
+* cumbersome overview table from Open Data Canada
+
+```{r}
+search_cansim_tables("job vacancy") %>% select(cansim_table_number,title) %>% knitr::kable()
+```
+
+
+--
+
+StatCan is working on better data discovery, hopefully things will get easier in the future.
+
+
+---
+class: medium-code
+## Combining StatCan tables
+To understand growth of jobs we combined LFS employment data with JVWS data on job vacancies.
+```{r}
+library(lubridate)
+lfs_data <- get_cansim("14-10-0293") %>% normalize_cansim_values() %>%
+  filter(`Labour force characteristics`=="Employment", Statistics=="Estimate")
+jv_data <- get_cansim("14-10-0325") %>% normalize_cansim_values() %>%
+  filter(Statistics=="Job vacancies") %>% mutate(Date=Date %m+% months(1))
+```
+
+Job vacancies are only available quarterly, so we combine 3 months moving average LFS data with job vacancy data time-shifted to the middle of the quarter.
+
+--
+```{r}
+jobs_data <- inner_join(lfs_data %>% select(Date,GeoUID,GEO,Employment=VALUE),
+                        jv_data %>% select(Date,GeoUID,`Job vacancies`=VALUE),
+                        by=c("Date","GeoUID")) %>%
+  filter(!is.na(`Job vacancies`)) %>%
+  pivot_longer(c("Job vacancies","Employment")) %>%
+  mutate(name=factor(name,levels=c("Job vacancies","Employment"))) %>%
+  filter(grepl("Canada|Lower Mainland|Toronto|Calgary",GEO))
+```
+
+Start dates for job vacancy data varies by geography, so it's safer to join and pivot the data than to just bind the rows.
+
+---
+class: medium-code
+## Combining StatCan tables
+```{r fig.height=4, fig.width=8}
+ggplot(jobs_data,aes(x=Date,y=value,fill=name)) +
+  geom_bar(stat="identity") +
+  facet_wrap("GEO",scales="free_y") +
+  scale_y_continuous(labels=scales::comma) +
+  labs(title="Jobs by economic region",fill=NULL,x=NULL,y=NULL,
+       caption="StatCan Tables 14-10-0293,14-10-0325")
+```
+
+---
+class: medium-code
+## Income by age groups
+```{r}
+income_age_groups <- c("16 to 24 years", "25 to 34 years" , "35 to 44 years" , 
+                       "45 to 54 years" , "55 to 64 years", "65 years and over")
+income_data <- get_cansim("11-10-0239") %>%
+  normalize_cansim_values(factors = TRUE) %>%
+  filter(GEO=="Canada",
+         Sex=="Both sexes",
+         Statistics=="Median income (excluding zeros)",
+         `Income source`=="Total income",
+         `Age group` %in% income_age_groups) 
+```
+Sometimes we want to do several similar plots, it can be useful to define a custom theme.
+```{r}
+line_theme <- list(
+  geom_line(), 
+  geom_point(data=~filter(.,Date==max(Date))),
+  scale_color_brewer(palette="Dark2",guide=FALSE),
+  theme_light(),
+  expand_limits(x=as.Date("2025-01-01")),
+  ggrepel::geom_text_repel(data=~filter(.,Date==max(Date)),aes(label=`Age group`),hjust=-0.1,
+                           color='black',direction="y",size=4),
+  scale_y_continuous(labels=scales::dollar)
+)
+```
+
+---
+class: medium-code
+## Income by age groups
+```{r fig.height=4.5, fig.width=7}
+ggplot(income_data,aes(x=Date,y=VALUE,color=`Age group`)) +
+  line_theme +
+  labs(title="Median income by age group in Canada", x=NULL, y="2017 constant dollars",
+       caption="StatCan Table 11-10-0239")
+```
+
+---
+class: medium-code
+## Wealth
+
+```{r}
+cpi <- get_cansim_vector("v41693271","1990-01-01") %>% normalize_cansim_values() %>%
+  filter(Date<="2016-12-31") %>% mutate(CPI=VALUE/last(VALUE,order_by=Date))
+wealth_age_groups <- c("Under 35 years","35 to 44 years" , "45 to 54 years",   "55 to 64 years" , "65 years and older")
+wealth_data <- get_cansim("11-10-0016") %>%
+  normalize_cansim_values(factors=TRUE) %>%
+  filter(GEO=="Canada",
+         `Assets and debts`=="Net Worth (assets less debts)",
+         Statistics=="Median value for those holding asset or debt",
+         `Economic family type`!="Economic families and persons not in an economic family",
+         `Age group` %in% wealth_age_groups) %>%
+  left_join(cpi %>% select(Date,CPI),by="Date") %>%
+  mutate(Value=VALUE/CPI) %>%
+  select(GEO,Date,`Age group`,`Confidence intervals`,`Economic family type`,Value) %>%
+  pivot_wider(names_from="Confidence intervals",values_from="Value")
+```
+
+Wealth data needs a bit more processing. 
+* We need to manually adjust the wealth data for inflation. 
+* We want to also pay attention to the confidence intervals.
+
+---
+class: medium-code
+## Wealth
+```{r fig.height=4, fig.width=9}
+ggplot(wealth_data,aes(x=Date,y=Estimate,color=`Age group`)) +
+  line_theme +
+  geom_ribbon(aes(ymin=`Lower bound of a 95% confidence interval`,
+                  ymax=`Upper bound of a 95% confidence interval`),fill="grey",alpha=0.3,size=0) +
+  facet_wrap("`Economic family type`") +
+  labs(title="Median net worth by age group in Canada",x=NULL,y="Constant 2016 dollars",
+       caption="StatCan Table 11-10-0239")
+```
+
+
+---
+## Census data
+Census data offers much richer variables and spatial resolution, but at coarse time intervals.
+
+Richer data comes at a price: Data discovery and acquisition is more complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a quick tour of CensusMapper...
+
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), and ideally install it in your `.Rprofile` so it's always available and won't expose your API key when sharing code.
+]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code
+## Census data
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+poverty_data <- get_census("CA16",regions=list(CMA="24462"),vectors=c(lico_at="v_CA16_2573"),
+                           geo_format="sf",level="CT") 
+ggplot(poverty_data,aes(fill=lico_at/100)) +
+  geom_sf(size=NA) +  
+  labs(title="Montrèal share of children in poverty",fill=NULL,caption="StatCan Census 2016")
+```
+
+---
+class: medium-code
+## Adapting for other region
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+poverty_data <- get_census("CA16",regions=list(CSD="3520005"),vectors=c(lico_at="v_CA16_2573"),
+                           geo_format="sf",level="CT") 
+g <- ggplot(poverty_data,aes(fill=lico_at/100)) +
+  geom_sf(size=NA) +  
+  labs(title="Toronto share of children in poverty",fill=NULL,caption="StatCan Census 2016")
+g
+```
+---
+## Styling
+```{r fig.height=4.5, fig.width=8}
+library(mountainmathHelpers)
+g + scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  geom_water() +  geom_roads() +
+  coord_sf(datum = NA)
+```
+
+
+---
+class: medium-code
+## Mixing census data with StatCan Tables
+```{r fig.height=4.2, fig.width=8}
+get_census("CA16",regions=list(CMA="35535"),geo_format = 'sf',level="CT") %>%
+  left_join(get_cansim("11-10-0074") %>% select(GeoUID,`D-index`=VALUE), by="GeoUID") %>%
+  ggplot(aes(fill=`D-index`)) +
+  geom_sf(size=0.1) + scale_fill_viridis_c() +
+  coord_sf(datum=NA,xlim=c(-79.8,-79.15),ylim=c(43.5,43.9)) +
+  labs(title="Income divergence index", caption="StatCan table 11-10-0074")
+```
+
+---
+# Census timelines
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+The higher frequency tables (CANSIM) split the timelines along census geographies, with overlap to facilitate splicing them together.
+
+A better way to do this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code
+# Tongfen
+```{r fig.height=3.5, fig.width=10}
+meta <- meta_for_ca_census_vectors(c(seniors_CA16="v_CA16_2522",seniors_CA06="v_CA06_92")) %>%
+  bind_rows(meta_for_additive_variables(c("CA16","CA06"),"Population"))
+seniors_data <- get_tongfen_ca_census(list(CMA="59935"), meta, level="DA") %>%
+  mutate(change=seniors_CA16/Population_CA16-seniors_CA06/Population_CA06) %>%
+  mutate(c=mountainmathHelpers::pretty_cut(change,c(-Inf,seq(-0.2,0.2,0.05),Inf),format=scales::percent))
+ggplot(seniors_data,aes(fill=c)) +
+  geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
+  coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  labs(title="Victoria percentage point change in seniors 2006-2016", fill=NULL)
+```
+
+
+---
+# TongFen with T1FF data
+```{r}
+years <- seq(2004,2018)
+variables <- setNames(c(paste0("v_TX",years,"_607"),paste0("v_TX",years,"_786")),
+                      c(paste0("families_",years),paste0("lico_",years)))
+meta <-meta_for_ca_census_vectors(variables)
+
+low_income <- get_tongfen_ca_census(regions = list(CMA=59933), meta=meta, level="CT") %>%
+  mutate(`2004-2018`=lico_2018/families_2018-lico_2004/families_2004,
+         `2004-2011`=lico_2011/families_2011-lico_2004/families_2004,
+         `2011-2018`=lico_2018/families_2018-lico_2011/families_2011)
+```
+--
+```{r}
+head(meta)
+```
+
+---
+# Low income families from T1FF data
+```{r fig.height=3.5, fig.width=11}
+low_income %>% pivot_longer(starts_with("20")) %>% sf::st_sf() %>%
+  ggplot(aes(fill=value)) + facet_wrap("name") +
+  geom_sf(size=0.1) + scale_fill_gradient2(labels=scales::percent) +
+  coord_sf(datum=NA,xlim=c(-123.25,-122.8),ylim=c(49.1,49.35)) +
+  labs(title="Change in low share of families in low income 2004-2018", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+---
+
+background-image: url("https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time_files/figure-html/vancouver_income_map-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Maps, graphs and text
+
+## [Reproducible documents](https://doodles.mountainmath.ca/blog/2018/10/28/understanding-income-distributions-across-geographies-and-time/)
+
+
+---
+
+
+background-image: url("https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation_files/figure-html/vancouver_d_index-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Iterating
+## [With each analysis we gain insight, but also gain ability to ask better questions. And iterate by adapting the code for previous analysis to go deeper. Reproducible and adaptable workflows facilitate this.](https://doodles.mountainmath.ca/blog/2020/09/21/income-mixing-and-segregation/)
+
+
+
+
+---
+## Recap
+
+* APIs make it easy to pull in data as needed. 
+* scripting data processing in R (or python) make analysis transparent, autitable and adaptable.
+* simply re-run the scripts when new data becomes available.
+* to collaborate just share the code, don't need to worry about sharing data and keeping data up-to-date.
+* iterative process: can easily add data analysis and visualization.
+* packages like **cansim** and **cancensus** provides stability against API changes, they abstract the changes under the hood and deliver (more) stable results.
+* packages like **tongfen** automate processes that are otherwise cumbersome and time consuming, making analysis across multiple census years trivial.
+
+
+---
+class: inverse center
+## Thanks for listening
+The RMarkdown for this presentation can be [found on GitHub](https://github.com/mountainMath/presentations/blob/master/ryerson_ua.Rmd) if anyone wants to download the code and adapt it for their own purposes. 
+
+### Please post your questions in the chat.
+### .....<span class="blinking-cursor">|</span>
+
+<div style="height:5%;"></div>
+
+<hr>
+
+You can find me on Twitter at [@vb_jens](https://twitter.com/vb_jens).
+
+My blog has lots of examples with code. [doodles.mountainmath.ca](https://doodles.mountainmath.ca)
+In particular 
+
+[examples using the {cansim} package](https://doodles.mountainmath.ca/categories/cansim/), 
+
+[examples using the {cancensus} package](https://doodles.mountainmath.ca/categories/cancensus/), and 
+
+[examples using the {tongfen} package](https://doodles.mountainmath.ca/categories/tongfen/).
+
+
+
