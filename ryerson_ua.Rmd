@@ -29,7 +29,12 @@ options(htmltools.dir.version = FALSE)
 options(servr.daemon = TRUE)
 library(tidyverse)
 ```
-
+```{r xaringanExtra, echo=FALSE}
+xaringanExtra::use_xaringan_extra(c("broadcast"))
+```
+```{r broadcast, echo=FALSE}
+xaringanExtra::use_broadcast()
+```
 
 ## Fetching, visualizing, and analyzing Statistics Canada’s data using R
 Slides are at https://mountainmath.ca/ryerson_ua for those wanting to follow along and copy-paste code on their own machine.
@@ -75,7 +80,7 @@ A slight complication, the `cancensus` package needs an API key. You can sign up
 options(cancensus.api_key='CensusMapper_a9d50fe058e2f43ec6a2aa1f569a82fa')
 ```
 
-This API key will expire later today, for future use replace it with your own and put this line into your `.Rprofile` file, that way it's available in every R session and you won't expose your API key when sharing code. 
+This API key <strike>will expire later today</strike> **has expired**, for future use replace it with your own and put this line into your `.Rprofile` file, that way it's available in every R session and you won't expose your API key when sharing code. 
 
 ---
 # cansim
@@ -555,7 +560,7 @@ class: center, bottom, inverse
 ## Recap
 
 * APIs make it easy to pull in data as needed. 
-* scripting data processing in R (or python) make analysis transparent, autitable and adaptable.
+* scripting data processing in R (or python) make analysis transparent, auditable and adaptable.
 * simply re-run the scripts when new data becomes available.
 * to collaborate just share the code, don't need to worry about sharing data and keeping data up-to-date.
 * iterative process: can easily add data analysis and visualization.

@@ -1,0 +1,310 @@
+---
+title: "GIS Day 2020"
+subtitle: "Introduction to CensusMapper and StatCan data in R"
+author: "Jens von Bergmann"
+date: '2020-10-19'
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      ratio: '16:10'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	dev = "svg"
+)
+options(htmltools.dir.version = FALSE)
+options(servr.daemon = TRUE)
+library(tidyverse)
+```
+```{r xaringanExtra, echo=FALSE}
+xaringanExtra::use_xaringan_extra(c("broadcast"))
+```
+```{r broadcast, echo=FALSE}
+xaringanExtra::use_broadcast()
+```
+
+
+## Overview
+Today we will learn
+* how to explore Census data, and build Canada-wide interactive maps on CensusMapper
+
+--
+* how to acquire and work with census data in R
+
+--
+* how to work with multi-year census data
+
+---
+## CensusMapper
+Census data offers riche variables and spatial resolution, but at coarse time intervals.
+
+Data discovery and acquisition can be complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data. It's Canada wide, covers all geographic levels down to census blocks, available for 1996 through 2016 censuses.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a tour of CensusMapper...
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/maps/731" target="_blank">CensusMapper Demo</a>
+
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
+---
+# Maps aren't analysis
+Maps are only one element in the toolbox to communicate the result of analysis. We usually present maps to complement a range of other visuals and other analysis results.
+
+How does the net migration effect the age distribution in each municipality? 
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+age_pyramid_styling <- list(
+  scale_x_discrete(breaks=c(seq(0, 100, 5),"100+")),
+  scale_y_continuous(labels = scales::comma),
+  coord_flip(),
+  scale_fill_brewer(palette = "Set1"),
+  theme_bw(),
+  labs(caption="StatCan 2016 census"))
+```
+```{r canada_age, fig.height=3.2, fig.width=10, message=FALSE, warning=FALSE, dev='svg'}
+cancensusHelpers::get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %>%
+  ggplot(aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") + age_pyramid_styling
+```
+
+--
+
+How to get the data to easily make these graphs?
+
+???
+Explain how net migration patterns lead to different age distributions.
+---
+# Data acquisition and processing in R
+The [*R* programming language](https://www.r-project.org) is a flexible and powerful tool for analysis and visualization.
+
+The [RStudio IDE](https://rstudio.com) has a user-friendly interface, and [RMarkdown](https://bookdown.org/yihui/rmarkdown/notebook.html) documents offer a way to seamlessly integrate our entire reproducible pipeline, all the way from data acquisition to presentation of results.
+
+For this talk we will use the following packages:
+  - [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+  - [`tongfen` package](https://mountainmath.github.io/tongfen/) to work with data across multiple census years
+  - [`sf` package](https://r-spatial.github.io/sf/index.html) for basic geospatial operations
+
+Generally, we will be working in the [`tidyverse` package](https://www.tidyverse.org), an *opinionated collection of R packages* for intuitive general-purpose data manipulations and visualization capabilities. These four packages is (almost) all that's needed for this talk.
+
+```{r}
+library(tidyverse)
+library(cancensus)
+#remotes::install_github("mountainmath/tongfen")
+library(tongfen)
+library(sf)
+```
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), and ideally install it in your `.Rprofile` so it's always available and won't expose your API key when sharing code.
+]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;">
+]
+
+---
+background-image: url("images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# <a href="https://censusmapper.ca/api" target="_blank">CensusMapper API Demo</a>
+
+
+---
+## API keys
+A slight complication, the `cancensus` package needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), but for today everyone who does not have one already is welcome to use a temporary API key:
+
+```{r eval=FALSE, include=TRUE}
+options(cancensus.api_key='CensusMapper_a9d50fe058e2f43ec6a2aa1f569a82fa')
+```
+
+This API key <strike>will expire later today</strike> **has expired**, for future use replace it with your own and put this line into your `.Rprofile` file, that way it's available in every R session and you won't expose your API key when sharing code. 
+
+---
+class: medium-code
+## Census data
+```{r fig.height=4, fig.width=10, message=FALSE, warning=FALSE}
+get_census("CA16",regions=list(CSD="5915022"),geo_format="sf",level="DA",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719")) %>%
+  ggplot(aes(fill=movers/base)) +
+  geom_sf(size=0.1) + coord_sf(datum = NA) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="City of Vancouver share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+```
+
+---
+class: medium-code
+## Census data
+```{r fig.height=4, fig.width=10, message=FALSE, warning=FALSE}
+data <- get_census("CA16",regions=list(CSD="3514021"),geo_format="sf",level="DA",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719"))
+g <- ggplot(data,aes(fill=movers/base)) + 
+  geom_sf(size=0.1) + coord_sf(datum = NA) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Cobourg share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+g
+```
+---
+## Add minimal styling
+```{r fig.height=4.5, fig.width=10, message=FALSE, warning=FALSE}
+#remotes::install_github("mountainmath/mountainmathHelpers")
+library(mountainmathHelpers)
+g + geom_water() + geom_roads() +
+  coord_sf(datum = NA,ylim=c(43.95,43.985),xlim=c(-78.2,-78.135)) 
+```
+
+---
+## Interactive maps
+
+```{r fig.height=5, fig.width=10, message=FALSE, warning=FALSE}
+library(mapdeck)
+mapdeck(token = getOption("mapbox_token"), style = mapdeck_style('dark')) %>%
+  add_sf(data = data %>% mutate(share=movers/base, info=scales::percent(share,accuracy = 0.1)) %>% 
+           rmapshaper::ms_simplify(keep = 0.2) %>% select(share,info), 
+              tooltip = "info", fill_opacity=150, fill_colour="share")
+```
+
+---
+
+
+# Census timelines
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+One way to deal with this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code
+# Tongfen
+```{r fig.height=3.5, fig.width=10}
+meta <- meta_for_ca_census_vectors(c(seniors_CA16="v_CA16_2522",seniors_CA06="v_CA06_92")) %>%
+  bind_rows(meta_for_additive_variables(c("CA16","CA06"),"Population"))
+seniors_data <- get_tongfen_ca_census(list(CSD="3514021"), meta, level="DA") %>%
+  mutate(change=seniors_CA16/Population_CA16-seniors_CA06/Population_CA06) %>%
+  mutate(c=mountainmathHelpers::pretty_cut(change,c(-Inf,seq(-0.2,0.2,0.05),Inf),format=scales::percent))
+ggplot(seniors_data,aes(fill=c)) +
+  geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
+  coord_sf(datum = NA) + 
+  labs(title="Cobourg percentage point change in seniors 2006-2016", fill=NULL,caption="StatCan Census 2006, 2016")
+```
+---
+class: medium-code
+## Summary graph
+```{r fig.height=3.5, fig.width=7}
+seniors_data %>%
+  st_drop_geometry() %>%
+  summarize_at(vars(matches("seniors|Population")),sum) %>%
+  mutate(`2016`=seniors_CA16/Population_CA16,`2006`=seniors_CA06/Population_CA06) %>%
+  pivot_longer(c("2006","2016"),names_to="Year",values_to="Share of seniors") %>%
+  ggplot(aes(x=Year,y=`Share of seniors`)) +
+  scale_y_continuous(labels=scales::percent) +
+  geom_bar(stat="identity",fill="steelblue") +
+  labs(title="Cobourg share of seniors",caption="StatCan Census 2006, 2016")
+```
+
+---
+class: medium-code
+# TongFen with T1FF data
+```{r}
+years <- seq(2004,2018)
+variables <- setNames(c(paste0("v_TX",years,"_607"),paste0("v_TX",years,"_786")),
+                      c(paste0("families_",years),paste0("lico_",years)))
+meta <-meta_for_ca_census_vectors(variables)
+
+low_income <- get_tongfen_ca_census(regions = list(CMA="35532"), meta=meta, level="CT") %>%
+  mutate(`2004-2018`=lico_2018/families_2018-lico_2004/families_2004,
+         `2004-2011`=lico_2011/families_2011-lico_2004/families_2004,
+         `2011-2018`=lico_2018/families_2018-lico_2011/families_2011)
+```
+--
+```{r}
+head(meta)
+```
+
+---
+class: medium-code
+# Low income families from T1FF data
+```{r fig.height=3.5, fig.width=11}
+low_income %>% pivot_longer(starts_with("20")) %>% st_sf() %>%
+  ggplot(aes(fill=value)) + facet_wrap("name") +
+  geom_sf(size=0.1) + scale_fill_gradient2(labels=scales::percent) +
+  geom_water() + geom_roads() +
+  coord_sf(datum=NA,xlim=c(-78.97,-78.74),ylim=c(43.85,44)) +
+  labs(title="Oshawa change in share of families in low income", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+---
+class: medium-code
+# Low income families timelines
+```{r fig.height=3.5, fig.width=11}
+left_join(low_income %>% pivot_longer(starts_with("families"),names_to="Year",
+                                names_pattern=".+_(\\d{4})",values_to="Families"),
+          low_income %>% pivot_longer(starts_with("lico"),names_to="Year",
+                                names_pattern=".+_(\\d{4})",values_to="Lico"),
+          by=c("TongfenID","Year")) %>%
+  select(TongfenID,Year,Families,Lico) %>%
+  mutate(Share=Lico/Families) %>%
+  ggplot(aes(x=Year,y=Share,group=TongfenID)) + geom_line(color="brown") + geom_point(shape=21) +
+  labs(title="Oshawa census tracts share of families in low income", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+---
+class: center, middle
+## Thanks for bearing with me
+These slides are online at https://mountainmath.ca/gis_day_2020.html and the R notebook that generated them includes the code that pulls in the data and made the graphs and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/gis_day_2020.Rmd).
+
+### Please ask questions or post them in the chat.
+### .....<span class="blinking-cursor">|</span>
+
+<div style="height:7%;"></div>
+
+<hr>
+
+You can find me on Twitter at [@vb_jens](https://twitter.com/vb_jens).
+
+My blog has lots of examples with code. [doodles.mountainmath.ca](https://doodles.mountainmath.ca)
+In particular 
+
+[examples using the {cancensus} package](https://doodles.mountainmath.ca/categories/cancensus/) and
+
+[examples using the {tongfen} package](https://doodles.mountainmath.ca/categories/tongfen/) and 
+
+[examples using the {cansim} package](https://doodles.mountainmath.ca/categories/cansim/). (We did not talk about this on today, that's another source for great Statistics Canada data on coarser geographies but more regular updates.)
+
+

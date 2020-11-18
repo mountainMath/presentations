@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>GIS Day 2020</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Jens von Bergmann" />
+    <meta name="date" content="2020-10-19" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <script src="libs/js-cookie/js.cookie.js"></script>
+    <script src="libs/peerjs/peerjs.min.js"></script>
+    <script src="libs/tiny.toast/toast.min.js"></script>
+    <link href="libs/xaringanExtra-broadcast/broadcast.css" rel="stylesheet" />
+    <script src="libs/xaringanExtra-broadcast/broadcast.js"></script>
+    <script src="libs/htmlwidgets/htmlwidgets.js"></script>
+    <script src="libs/mapdeck-binding/mapdeck.js"></script>
+    <script src="libs/mpadeck_functions/mapdeck_functions.js"></script>
+    <script src="libs/deckgl/deckgl.min.js"></script>
+    <script src="libs/legend/legend.js"></script>
+    <script src="libs/title/title.js"></script>
+    <script src="libs/mapdeck_location/mapdeck_location.js"></script>
+    <script src="libs/mapdeck_colours/mapdeck_colours.js"></script>
+    <script src="libs/mapdeck_coordinates/mapdeck_coordinates.js"></script>
+    <link href="libs/mapboxgl/mapbox-gl.css" rel="stylesheet" />
+    <script src="libs/mapboxgl/mapbox-gl.js"></script>
+    <link href="libs/mapdeck/mapdeck.css" rel="stylesheet" />
+    <script src="libs/mpadeck-binding/mapdeck.js"></script>
+    <script src="libs/polygon/polygon.js"></script>
+    <link rel="stylesheet" href="my_css.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# GIS Day 2020
+## Introduction to CensusMapper and StatCan data in R
+### Jens von Bergmann
+### 2020-10-19
+
+---
+
+
+
+
+
+
+
+
+## Overview
+Today we will learn
+* how to explore Census data, and build Canada-wide interactive maps on CensusMapper
+
+--
+* how to acquire and work with census data in R
+
+--
+* how to work with multi-year census data
+
+---
+## CensusMapper
+Census data offers riche variables and spatial resolution, but at coarse time intervals.
+
+Data discovery and acquisition can be complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data. It's Canada wide, covers all geographic levels down to census blocks, available for 1996 through 2016 censuses.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a tour of CensusMapper...
+
+---
+background-image: url("https://doodles.mountainmath.ca/images/net_van.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/maps/731" target="_blank"&gt;CensusMapper Demo&lt;/a&gt;
+
+???
+Lots of hidden features too that aren't accessible to general public. Don't have the resources to make them more user-friendly and release to public free to use.
+---
+# Maps aren't analysis
+Maps are only one element in the toolbox to communicate the result of analysis. We usually present maps to complement a range of other visuals and other analysis results.
+
+How does the net migration effect the age distribution in each municipality? 
+
+
+```r
+cancensusHelpers::get_age_data('CA16',list(CSD=c("5915022","5915004","5915055"))) %&gt;%
+  ggplot(aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") + age_pyramid_styling
+```
+
+![](gis_day_2020_files/figure-html/canada_age-1.svg)&lt;!-- --&gt;
+
+--
+
+How to get the data to easily make these graphs?
+
+???
+Explain how net migration patterns lead to different age distributions.
+---
+# Data acquisition and processing in R
+The [*R* programming language](https://www.r-project.org) is a flexible and powerful tool for analysis and visualization.
+
+The [RStudio IDE](https://rstudio.com) has a user-friendly interface, and [RMarkdown](https://bookdown.org/yihui/rmarkdown/notebook.html) documents offer a way to seamlessly integrate our entire reproducible pipeline, all the way from data acquisition to presentation of results.
+
+For this talk we will use the following packages:
+  - [`cancensus` package](https://mountainmath.github.io/cancensus/) to access census data via the [CensusMapper API](https://censusmapper.ca/api)
+  - [`tongfen` package](https://mountainmath.github.io/tongfen/) to work with data across multiple census years
+  - [`sf` package](https://r-spatial.github.io/sf/index.html) for basic geospatial operations
+
+Generally, we will be working in the [`tidyverse` package](https://www.tidyverse.org), an *opinionated collection of R packages* for intuitive general-purpose data manipulations and visualization capabilities. These four packages is (almost) all that's needed for this talk.
+
+
+```r
+library(tidyverse)
+library(cancensus)
+#remotes::install_github("mountainmath/tongfen")
+library(tongfen)
+library(sf)
+```
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), and ideally install it in your `.Rprofile` so it's always available and won't expose your API key when sharing code.
+]
+.pull-right[
+&lt;img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;"&gt;
+]
+
+---
+background-image: url("images/api_tool.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# &lt;a href="https://censusmapper.ca/api" target="_blank"&gt;CensusMapper API Demo&lt;/a&gt;
+
+
+---
+## API keys
+A slight complication, the `cancensus` package needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), but for today everyone who does not have one already is welcome to use a temporary API key:
+
+
+```r
+options(cancensus.api_key='CensusMapper_a9d50fe058e2f43ec6a2aa1f569a82fa')
+```
+
+This API key &lt;strike&gt;will expire later today&lt;/strike&gt; **has expired**, for future use replace it with your own and put this line into your `.Rprofile` file, that way it's available in every R session and you won't expose your API key when sharing code. 
+
+---
+class: medium-code
+## Census data
+
+```r
+get_census("CA16",regions=list(CSD="5915022"),geo_format="sf",level="DA",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719")) %&gt;%
+  ggplot(aes(fill=movers/base)) +
+  geom_sf(size=0.1) + coord_sf(datum = NA) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="City of Vancouver share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+```
+
+![](gis_day_2020_files/figure-html/unnamed-chunk-4-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+## Census data
+
+```r
+data &lt;- get_census("CA16",regions=list(CSD="3514021"),geo_format="sf",level="DA",
+           vectors=c(movers="v_CA16_6725",base="v_CA16_6719"))
+g &lt;- ggplot(data,aes(fill=movers/base)) + 
+  geom_sf(size=0.1) + coord_sf(datum = NA) + 
+  scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  labs(title="Cobourg share of population moved 2011-2016",fill=NULL,caption="StatCan Census 2016")
+g
+```
+
+![](gis_day_2020_files/figure-html/unnamed-chunk-5-1.svg)&lt;!-- --&gt;
+---
+## Add minimal styling
+
+```r
+#remotes::install_github("mountainmath/mountainmathHelpers")
+library(mountainmathHelpers)
+g + geom_water() + geom_roads() +
+  coord_sf(datum = NA,ylim=c(43.95,43.985),xlim=c(-78.2,-78.135)) 
+```
+
+![](gis_day_2020_files/figure-html/unnamed-chunk-6-1.svg)&lt;!-- --&gt;
+
+---
+## Interactive maps
+
+
+```r
+library(mapdeck)
+mapdeck(token = getOption("mapbox_token"), style = mapdeck_style('dark')) %&gt;%
+  add_sf(data = data %&gt;% mutate(share=movers/base, info=scales::percent(share,accuracy = 0.1)) %&gt;% 
+           rmapshaper::ms_simplify(keep = 0.2) %&gt;% select(share,info), 
+              tooltip = "info", fill_opacity=150, fill_colour="share")
+```
+
+<div id="htmlwidget-f5fc9c51b88adc2e0948" style="width:720px;height:360px;" class="mapdeck html-widget"></div>
+<script type="application/json" data-for="htmlwidget-f5fc9c51b88adc2e0948">{"x":{"access_token":"pk.eyJ1IjoiamVucy1tb3VudGFpbm1hdGgiLCJhIjoiTmJ2Z3FHNCJ9.ifMzNW0vPH1Yc6As93HP9A","style":"mapbox://styles/mapbox/dark-v10","pitch":0,"zoom":0,"location":[0,0],"bearing":0,"max_zoom":20,"min_zoom":0,"max_pitch":60,"min_pitch":0,"show_view_state":false,"repeat_view":false,"calls":[{"functions":"add_polygon_geo","args":["mapdeck",[{"type":"Feature","properties":{"elevation":0,"fill_colour":"#287C8E96","stroke_colour":"#440154FF","tooltip":"36.0%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.153835,43.981781],[-78.159261,43.980512],[-78.163442,43.979553],[-78.173306,43.97729],[-78.175516,43.982076],[-78.175492,43.982584],[-78.173147,43.986033],[-78.183671,43.982611],[-78.186299,43.981866],[-78.186367,43.98202],[-78.183915,43.982725],[-78.178644,43.984495],[-78.176453,43.985058],[-78.170229,43.987202],[-78.167834,43.988399],[-78.162856,43.991399],[-78.160946,43.992168],[-78.158535,43.992641],[-78.15641,43.992759],[-78.148598,43.992892],[-78.144513,43.993572],[-78.142853,43.990051],[-78.146623,43.989956],[-78.144261,43.984873],[-78.145377,43.983704],[-78.153835,43.981781]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#433D8596","stroke_colour":"#440154FF","tooltip":"28.8%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.160567,43.972928],[-78.163039,43.972323],[-78.164953,43.976638],[-78.162432,43.977214],[-78.163442,43.979553],[-78.159261,43.980512],[-78.15828,43.97836],[-78.158213,43.977055],[-78.162141,43.976523],[-78.160567,43.972928]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#52C56996","stroke_colour":"#440154FF","tooltip":"45.5%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.163442,43.979553],[-78.162432,43.977214],[-78.164953,43.976638],[-78.163039,43.972323],[-78.165194,43.971836],[-78.16575,43.97105],[-78.16722,43.97094],[-78.167232,43.972226],[-78.170673,43.971441],[-78.172507,43.975349],[-78.173743,43.974785],[-78.174828,43.97636],[-78.177109,43.975841],[-78.177322,43.97635],[-78.183182,43.975009],[-78.18446900000001,43.977859],[-78.185831,43.977523],[-78.186865,43.979386],[-78.187134,43.980022],[-78.185666,43.980499],[-78.186299,43.981866],[-78.183671,43.982611],[-78.173147,43.986033],[-78.175492,43.982584],[-78.175516,43.982076],[-78.173306,43.97729],[-78.163442,43.979553]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#44015496","stroke_colour":"#440154FF","tooltip":"23.4%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.173743,43.974785],[-78.175546,43.974361],[-78.177078,43.974922],[-78.178645,43.973421],[-78.182122,43.972651],[-78.183182,43.975009],[-78.177322,43.97635],[-78.177109,43.975841],[-78.174828,43.97636],[-78.173743,43.974785]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#33628D96","stroke_colour":"#440154FF","tooltip":"32.8%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.180658,43.969347],[-78.182122,43.972651],[-78.178645,43.973421],[-78.17835,43.971757],[-78.177081,43.971969],[-78.176408,43.970367],[-78.180658,43.969347]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#33618D96","stroke_colour":"#440154FF","tooltip":"32.7%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.170673,43.971441],[-78.168583,43.966635],[-78.172027,43.965757],[-78.171186,43.964845],[-78.171167,43.963395],[-78.173714,43.962783],[-78.174269,43.963967],[-78.175908,43.963576],[-78.177332,43.966663],[-78.179199,43.966187],[-78.180658,43.969347],[-78.176408,43.970367],[-78.177081,43.971969],[-78.17835,43.971757],[-78.178645,43.973421],[-78.177078,43.974922],[-78.175546,43.974361],[-78.173743,43.974785],[-78.172507,43.975349],[-78.170673,43.971441]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#45C07096","stroke_colour":"#440154FF","tooltip":"44.7%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.182122,43.972651],[-78.180658,43.969347],[-78.179199,43.966187],[-78.177332,43.966663],[-78.175908,43.963576],[-78.174269,43.963967],[-78.173714,43.962783],[-78.175366,43.962374],[-78.178823,43.961523],[-78.182802,43.964601],[-78.184571,43.963033],[-78.185358,43.962738],[-78.187055,43.9672],[-78.187423,43.967578],[-78.188519,43.968911],[-78.192764,43.971979],[-78.192995,43.97282],[-78.187014,43.974131],[-78.183182,43.975009],[-78.182122,43.972651]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#306A8E96","stroke_colour":"#440154FF","tooltip":"33.7%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.17934,43.957321],[-78.180022,43.958816],[-78.180486,43.961132],[-78.178823,43.961523],[-78.175366,43.962374],[-78.175618,43.961003],[-78.174793,43.959218],[-78.175468,43.958127],[-78.17934,43.957321]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#228C8D96","stroke_colour":"#440154FF","tooltip":"38.0%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.170175,43.958311],[-78.169957,43.957657],[-78.171452,43.957145],[-78.174994,43.95708],[-78.17871,43.95628],[-78.17934,43.957321],[-78.175468,43.958127],[-78.174793,43.959218],[-78.175618,43.961003],[-78.175366,43.962374],[-78.173714,43.962783],[-78.172124,43.959251],[-78.170474,43.959363],[-78.170175,43.958311]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#FDE72496","stroke_colour":"#440154FF","tooltip":"53.6%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.169272,43.962097],[-78.168267,43.959911],[-78.167944,43.958562],[-78.170175,43.958311],[-78.170474,43.959363],[-78.172124,43.959251],[-78.173714,43.962783],[-78.171167,43.963395],[-78.170482,43.961812],[-78.169272,43.962097]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#7ED24F96","stroke_colour":"#440154FF","tooltip":"47.8%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.165327,43.963025],[-78.164796,43.96186],[-78.163158,43.962242],[-78.162661,43.961149],[-78.165736,43.960443],[-78.165051,43.958868],[-78.167944,43.958562],[-78.168267,43.959911],[-78.169272,43.962097],[-78.165327,43.963025]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#24888E96","stroke_colour":"#440154FF","tooltip":"37.5%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.166087,43.964593],[-78.165327,43.963025],[-78.169272,43.962097],[-78.170482,43.961812],[-78.171167,43.963395],[-78.171186,43.964845],[-78.172027,43.965757],[-78.168583,43.966635],[-78.167524,43.96425],[-78.166087,43.964593]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#53C56896","stroke_colour":"#440154FF","tooltip":"45.5%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.160567,43.972928],[-78.159314,43.970186],[-78.158177,43.967619],[-78.159979,43.967214],[-78.159519,43.96614],[-78.162532,43.965441],[-78.162194,43.964685],[-78.164048,43.964227],[-78.16441,43.964992],[-78.166087,43.964593],[-78.167524,43.96425],[-78.168583,43.966635],[-78.170673,43.971441],[-78.167232,43.972226],[-78.16722,43.97094],[-78.16575,43.97105],[-78.165194,43.971836],[-78.163039,43.972323],[-78.160567,43.972928]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#43BE7196","stroke_colour":"#440154FF","tooltip":"44.6%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.156451,43.963822],[-78.163158,43.962242],[-78.164796,43.96186],[-78.165327,43.963025],[-78.166087,43.964593],[-78.16441,43.964992],[-78.164048,43.964227],[-78.162194,43.964685],[-78.162532,43.965441],[-78.159519,43.96614],[-78.158822,43.964547],[-78.156994,43.964979],[-78.156451,43.963822]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#D7E21A96","stroke_colour":"#440154FF","tooltip":"51.8%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.15421,43.96255],[-78.15572,43.962156],[-78.156451,43.963822],[-78.156994,43.964979],[-78.158822,43.964547],[-78.159519,43.96614],[-78.159979,43.967214],[-78.158177,43.967619],[-78.159314,43.970186],[-78.155242,43.969979],[-78.152582,43.964299],[-78.15477,43.96391],[-78.15421,43.96255]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2D718E96","stroke_colour":"#440154FF","tooltip":"34.6%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.156663,43.95965],[-78.158793,43.959154],[-78.159691,43.96122],[-78.162401,43.960603],[-78.162661,43.961149],[-78.163158,43.962242],[-78.156451,43.963822],[-78.15572,43.962156],[-78.157599,43.961708],[-78.157136,43.960697],[-78.155259,43.961118],[-78.154774,43.960062],[-78.156663,43.95965]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#FDE72596","stroke_colour":"#440154FF","tooltip":"53.6%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.148867,43.95743],[-78.153175,43.956484],[-78.153876,43.957987],[-78.15574,43.957574],[-78.156663,43.95965],[-78.154774,43.960062],[-78.155259,43.961118],[-78.157136,43.960697],[-78.157599,43.961708],[-78.15572,43.962156],[-78.15421,43.96255],[-78.151409,43.963183],[-78.148867,43.95743]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#99D93E96","stroke_colour":"#440154FF","tooltip":"49.0%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.156663,43.95965],[-78.15574,43.957574],[-78.153876,43.957987],[-78.153175,43.956484],[-78.148867,43.95743],[-78.144778,43.958228],[-78.140763,43.95774],[-78.140475,43.956977],[-78.145553,43.957401],[-78.149469,43.95658],[-78.151856,43.955389],[-78.152349,43.95577],[-78.155659,43.956915],[-78.159284,43.957473],[-78.161002,43.957525],[-78.163873,43.956912],[-78.164606,43.957471],[-78.167441,43.956839],[-78.167064,43.955713],[-78.167443,43.956819],[-78.167944,43.958562],[-78.165051,43.958868],[-78.165736,43.960443],[-78.162661,43.961149],[-78.162401,43.960603],[-78.159691,43.96122],[-78.158793,43.959154],[-78.156663,43.95965]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48196B96","stroke_colour":"#440154FF","tooltip":"25.4%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.14172,43.962743],[-78.140111,43.959119],[-78.141204,43.958679],[-78.140763,43.95774],[-78.144778,43.958228],[-78.148867,43.95743],[-78.151409,43.963183],[-78.145987,43.96447],[-78.144046,43.964926],[-78.14293,43.96246],[-78.14172,43.962743]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48146796","stroke_colour":"#440154FF","tooltip":"25.0%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.145987,43.96447],[-78.151409,43.963183],[-78.15421,43.96255],[-78.15477,43.96391],[-78.152582,43.964299],[-78.155242,43.969979],[-78.159314,43.970186],[-78.160567,43.972928],[-78.162141,43.976523],[-78.158213,43.977055],[-78.15828,43.97836],[-78.159261,43.980512],[-78.153835,43.981781],[-78.148935,43.971107],[-78.145987,43.96447]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#24878E96","stroke_colour":"#440154FF","tooltip":"37.4%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.123815,43.963374],[-78.132045,43.961231],[-78.134243,43.960881],[-78.134739,43.961974],[-78.135882,43.961795],[-78.137337,43.964983],[-78.13552,43.965441],[-78.136153,43.966781],[-78.139306,43.966032],[-78.138319,43.963477],[-78.13703,43.960987],[-78.137785,43.959799],[-78.139245,43.960547],[-78.138683,43.961343],[-78.140103,43.962144],[-78.140509,43.963046],[-78.14172,43.962743],[-78.14293,43.96246],[-78.144046,43.964926],[-78.145987,43.96447],[-78.148935,43.971107],[-78.153835,43.981781],[-78.145377,43.983704],[-78.144261,43.984873],[-78.146623,43.989956],[-78.142853,43.990051],[-78.144513,43.993572],[-78.142213,43.994318],[-78.138625,43.996196],[-78.134248,43.986684],[-78.126431,43.969093],[-78.123815,43.963374]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48267696","stroke_colour":"#440154FF","tooltip":"26.6%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.123815,43.963374],[-78.120936,43.956999],[-78.13096,43.958404],[-78.135004,43.957506],[-78.140475,43.956977],[-78.140763,43.95774],[-78.141204,43.958679],[-78.140111,43.959119],[-78.14172,43.962743],[-78.140509,43.963046],[-78.140103,43.962144],[-78.138683,43.961343],[-78.139245,43.960547],[-78.137785,43.959799],[-78.13703,43.960987],[-78.138319,43.963477],[-78.139306,43.966032],[-78.136153,43.966781],[-78.13552,43.965441],[-78.137337,43.964983],[-78.135882,43.961795],[-78.134739,43.961974],[-78.134243,43.960881],[-78.132045,43.961231],[-78.123815,43.963374]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#B3DD2D96","stroke_colour":"#440154FF","tooltip":"50.2%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.198259,43.967782],[-78.20037,43.96689],[-78.19942,43.96481],[-78.197559,43.964892],[-78.19778,43.964169],[-78.198957,43.964071],[-78.198572,43.962982],[-78.197133,43.962568],[-78.19783,43.961793],[-78.19442,43.960881],[-78.194842,43.960117],[-78.19629,43.960342],[-78.196705,43.95947],[-78.193102,43.959219],[-78.193617,43.960987],[-78.192559,43.961231],[-78.191719,43.959491],[-78.191118,43.959278],[-78.187288,43.960408],[-78.186362,43.958369],[-78.18845,43.95803],[-78.187503,43.955849],[-78.184722,43.955357],[-78.182255,43.955873],[-78.183414,43.958521],[-78.180022,43.958816],[-78.17934,43.957321],[-78.17871,43.95628],[-78.174994,43.95708],[-78.171452,43.957145],[-78.169957,43.957657],[-78.170175,43.958311],[-78.167944,43.958562],[-78.167443,43.956819],[-78.167064,43.955713],[-78.168693,43.954619],[-78.170321,43.954191],[-78.175923,43.954321],[-78.177244,43.954056],[-78.181659,43.954246],[-78.184746,43.955115],[-78.187243,43.955564],[-78.189511,43.955556],[-78.192876,43.955819],[-78.193693,43.955677],[-78.200036,43.955428],[-78.201729,43.955208],[-78.204392,43.95449],[-78.208419,43.952971],[-78.214855,43.967742],[-78.20276,43.97057],[-78.20146,43.96769],[-78.199583,43.967985],[-78.198259,43.967782]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#8DD64596","stroke_colour":"#440154FF","tooltip":"48.5%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.186362,43.958369],[-78.183414,43.958521],[-78.182255,43.955873],[-78.184722,43.955357],[-78.187503,43.955849],[-78.18845,43.95803],[-78.186362,43.958369]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#297B8E96","stroke_colour":"#440154FF","tooltip":"35.9%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.178823,43.961523],[-78.180486,43.961132],[-78.180022,43.958816],[-78.183414,43.958521],[-78.186362,43.958369],[-78.187288,43.960408],[-78.187931,43.961838],[-78.189989,43.9663],[-78.188609,43.966743],[-78.187423,43.967578],[-78.187055,43.9672],[-78.185358,43.962738],[-78.184571,43.963033],[-78.182802,43.964601],[-78.178823,43.961523]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#2FB37C96","stroke_colour":"#440154FF","tooltip":"43.0%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.187288,43.960408],[-78.191118,43.959278],[-78.191719,43.959491],[-78.192559,43.961231],[-78.190325,43.962077],[-78.189821,43.961416],[-78.187931,43.961838],[-78.187288,43.960408]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#1F958B96","stroke_colour":"#440154FF","tooltip":"39.1%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.189989,43.9663],[-78.187931,43.961838],[-78.189821,43.961416],[-78.190325,43.962077],[-78.192559,43.961231],[-78.193557,43.963588],[-78.192674,43.96461],[-78.193102,43.965575],[-78.191967,43.965844],[-78.191587,43.964926],[-78.19054,43.965179],[-78.189989,43.9663]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#29AF8096","stroke_colour":"#440154FF","tooltip":"42.4%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.192559,43.961231],[-78.193617,43.960987],[-78.193102,43.959219],[-78.196705,43.95947],[-78.19629,43.960342],[-78.194842,43.960117],[-78.19442,43.960881],[-78.19783,43.961793],[-78.197133,43.962568],[-78.193557,43.963588],[-78.192559,43.961231]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#9FDA3996","stroke_colour":"#440154FF","tooltip":"49.3%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.193102,43.965575],[-78.192674,43.96461],[-78.193557,43.963588],[-78.197133,43.962568],[-78.198572,43.962982],[-78.198957,43.964071],[-78.19778,43.964169],[-78.197559,43.964892],[-78.19942,43.96481],[-78.20037,43.96689],[-78.198259,43.967782],[-78.197077,43.967996],[-78.197571,43.969142],[-78.196254,43.969587],[-78.195746,43.968467],[-78.19435,43.965282],[-78.193102,43.965575]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#470C5F96","stroke_colour":"#440154FF","tooltip":"24.3%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.188519,43.968911],[-78.187423,43.967578],[-78.188609,43.966743],[-78.189989,43.9663],[-78.19054,43.965179],[-78.191587,43.964926],[-78.191967,43.965844],[-78.193102,43.965575],[-78.19435,43.965282],[-78.195746,43.968467],[-78.194273,43.969556],[-78.191752,43.970152],[-78.19069,43.967821],[-78.190004,43.967822],[-78.188519,43.968911]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#E8E41996","stroke_colour":"#440154FF","tooltip":"52.6%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.188519,43.968911],[-78.190004,43.967822],[-78.19069,43.967821],[-78.191752,43.970152],[-78.194273,43.969556],[-78.195746,43.968467],[-78.196254,43.969587],[-78.197571,43.969142],[-78.197077,43.967996],[-78.198259,43.967782],[-78.199583,43.967985],[-78.20146,43.96769],[-78.20276,43.97057],[-78.192995,43.97282],[-78.192764,43.971979],[-78.188519,43.968911]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#F8E62196","stroke_colour":"#440154FF","tooltip":"53.3%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.20276,43.97057],[-78.204727,43.975594],[-78.206166,43.978744],[-78.201459,43.979225],[-78.193543,43.980502],[-78.186367,43.98202],[-78.186299,43.981866],[-78.188942,43.981248],[-78.196156,43.980003],[-78.192995,43.97282],[-78.20276,43.97057]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#24868E96","stroke_colour":"#440154FF","tooltip":"37.3%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.192995,43.97282],[-78.196156,43.980003],[-78.188942,43.981248],[-78.186299,43.981866],[-78.185666,43.980499],[-78.187134,43.980022],[-78.186865,43.979386],[-78.188571,43.978905],[-78.188473,43.978075],[-78.187329,43.975643],[-78.187014,43.974131],[-78.192995,43.97282]]]}}},{"type":"Feature","properties":{"elevation":0,"fill_colour":"#48267696","stroke_colour":"#440154FF","tooltip":"26.6%"},"geometry":{"geometry":{"type":"Polygon","coordinates":[[[-78.183182,43.975009],[-78.187014,43.974131],[-78.187329,43.975643],[-78.188473,43.978075],[-78.188571,43.978905],[-78.186865,43.979386],[-78.185831,43.977523],[-78.18446900000001,43.977859],[-78.183182,43.975009]]]}}}],"polygon-defaultLayerId",[],false,"#AAFFFFFF",{"fill_colour":[false]},[[-78.2148548,43.9529705],[-78.1209359,43.9961959]],true,false,null,false,1,null]}]},"evals":[],"jsHooks":[]}</script>
+
+---
+
+
+# Census timelines
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+One way to deal with this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).]
+.pull-right[
+&lt;img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;"&gt;
+]
+
+---
+class: medium-code
+# Tongfen
+
+```r
+meta &lt;- meta_for_ca_census_vectors(c(seniors_CA16="v_CA16_2522",seniors_CA06="v_CA06_92")) %&gt;%
+  bind_rows(meta_for_additive_variables(c("CA16","CA06"),"Population"))
+seniors_data &lt;- get_tongfen_ca_census(list(CSD="3514021"), meta, level="DA") %&gt;%
+  mutate(change=seniors_CA16/Population_CA16-seniors_CA06/Population_CA06) %&gt;%
+  mutate(c=mountainmathHelpers::pretty_cut(change,c(-Inf,seq(-0.2,0.2,0.05),Inf),format=scales::percent))
+ggplot(seniors_data,aes(fill=c)) +
+  geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
+  coord_sf(datum = NA) + 
+  labs(title="Cobourg percentage point change in seniors 2006-2016", fill=NULL,caption="StatCan Census 2006, 2016")
+```
+
+![](gis_day_2020_files/figure-html/unnamed-chunk-8-1.svg)&lt;!-- --&gt;
+---
+class: medium-code
+## Summary graph
+
+```r
+seniors_data %&gt;%
+  st_drop_geometry() %&gt;%
+  summarize_at(vars(matches("seniors|Population")),sum) %&gt;%
+  mutate(`2016`=seniors_CA16/Population_CA16,`2006`=seniors_CA06/Population_CA06) %&gt;%
+  pivot_longer(c("2006","2016"),names_to="Year",values_to="Share of seniors") %&gt;%
+  ggplot(aes(x=Year,y=`Share of seniors`)) +
+  scale_y_continuous(labels=scales::percent) +
+  geom_bar(stat="identity",fill="steelblue") +
+  labs(title="Cobourg share of seniors",caption="StatCan Census 2006, 2016")
+```
+
+![](gis_day_2020_files/figure-html/unnamed-chunk-9-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+# TongFen with T1FF data
+
+```r
+years &lt;- seq(2004,2018)
+variables &lt;- setNames(c(paste0("v_TX",years,"_607"),paste0("v_TX",years,"_786")),
+                      c(paste0("families_",years),paste0("lico_",years)))
+meta &lt;-meta_for_ca_census_vectors(variables)
+
+low_income &lt;- get_tongfen_ca_census(regions = list(CMA="35532"), meta=meta, level="CT") %&gt;%
+  mutate(`2004-2018`=lico_2018/families_2018-lico_2004/families_2004,
+         `2004-2011`=lico_2011/families_2011-lico_2004/families_2004,
+         `2011-2018`=lico_2018/families_2018-lico_2011/families_2011)
+```
+--
+
+```r
+head(meta)
+```
+
+```
+## # A tibble: 6 x 10
+##   variable     label         dataset type     aggregation units  rule     parent geo_dataset  year
+##   &lt;chr&gt;        &lt;chr&gt;         &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;       &lt;chr&gt;  &lt;chr&gt;    &lt;lgl&gt;  &lt;chr&gt;       &lt;int&gt;
+## 1 v_TX2004_607 families_2004 TX2004  Original Additive    Number Additive NA     CA01         2004
+## 2 v_TX2005_607 families_2005 TX2005  Original Additive    Number Additive NA     CA01         2005
+## 3 v_TX2006_607 families_2006 TX2006  Original Additive    Number Additive NA     CA06         2006
+## 4 v_TX2007_607 families_2007 TX2007  Original Additive    Number Additive NA     CA06         2007
+## 5 v_TX2008_607 families_2008 TX2008  Original Additive    Number Additive NA     CA06         2008
+## 6 v_TX2009_607 families_2009 TX2009  Original Additive    Number Additive NA     CA06         2009
+```
+
+---
+class: medium-code
+# Low income families from T1FF data
+
+```r
+low_income %&gt;% pivot_longer(starts_with("20")) %&gt;% st_sf() %&gt;%
+  ggplot(aes(fill=value)) + facet_wrap("name") +
+  geom_sf(size=0.1) + scale_fill_gradient2(labels=scales::percent) +
+  geom_water() + geom_roads() +
+  coord_sf(datum=NA,xlim=c(-78.97,-78.74),ylim=c(43.85,44)) +
+  labs(title="Oshawa change in share of families in low income", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+![](gis_day_2020_files/figure-html/unnamed-chunk-12-1.svg)&lt;!-- --&gt;
+
+---
+class: medium-code
+# Low income families timelines
+
+```r
+left_join(low_income %&gt;% pivot_longer(starts_with("families"),names_to="Year",
+                                names_pattern=".+_(\\d{4})",values_to="Families"),
+          low_income %&gt;% pivot_longer(starts_with("lico"),names_to="Year",
+                                names_pattern=".+_(\\d{4})",values_to="Lico"),
+          by=c("TongfenID","Year")) %&gt;%
+  select(TongfenID,Year,Families,Lico) %&gt;%
+  mutate(Share=Lico/Families) %&gt;%
+  ggplot(aes(x=Year,y=Share,group=TongfenID)) + geom_line(color="brown") + geom_point(shape=21) +
+  labs(title="Oshawa census tracts share of families in low income", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+![](gis_day_2020_files/figure-html/unnamed-chunk-13-1.svg)&lt;!-- --&gt;
+---
+class: center, middle
+## Thanks for bearing with me
+These slides are online at https://mountainmath.ca/gis_day_2020.html and the R notebook that generated them includes the code that pulls in the data and made the graphs and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/gis_day_2020.Rmd).
+
+### Please ask questions or post them in the chat.
+### .....&lt;span class="blinking-cursor"&gt;|&lt;/span&gt;
+
+&lt;div style="height:7%;"&gt;&lt;/div&gt;
+
+&lt;hr&gt;
+
+You can find me on Twitter at [@vb_jens](https://twitter.com/vb_jens).
+
+My blog has lots of examples with code. [doodles.mountainmath.ca](https://doodles.mountainmath.ca)
+In particular 
+
+[examples using the {cancensus} package](https://doodles.mountainmath.ca/categories/cancensus/) and
+
+[examples using the {tongfen} package](https://doodles.mountainmath.ca/categories/tongfen/) and 
+
+[examples using the {cansim} package](https://doodles.mountainmath.ca/categories/cansim/). (We did not talk about this on today, that's another source for great Statistics Canada data on coarser geographies but more regular updates.)
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="libs/remark-latest.min.js"></script>
+<script src="macros.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:10",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
