@@ -1,0 +1,383 @@
+---
+title: "{cancensus} and Mixing Data"
+subtitle: "CABE Workshop"
+author: "Jens von Bergmann"
+date: '2021-04-14'
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      ratio: '16:10'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	dev = "svg"
+)
+options(htmltools.dir.version = FALSE)
+options(servr.daemon = TRUE)
+library(tidyverse)
+library(cancensus)
+library(cansim)
+```
+```{r xaringanExtra, echo=FALSE}
+xaringanExtra::use_xaringan_extra(c("broadcast"))
+```
+```{r broadcast, echo=FALSE}
+xaringanExtra::use_broadcast()
+```
+
+
+## {cancensus} and Mixing Data
+Slides are at https://mountainmath.ca/cabe_workshop2 for those wanting to follow along and copy-paste code on their own machine.
+
+Census data is central in situating analysis, whether we want to make use of census data directly, mix it with our own data or just use it to calibrate external data we have.
+
+In this workshop we will explore how to work with census data and use it in conjunction with our own data.
+
+We will assume familiarity with Rmarkdown, basic data manipulations in tidyverse as done [in the previous workshop](https://mountainmath.ca/cabe_workshop1).
+
+---
+## Census data
+Census data offers rich variables at high spatial resolution, but at coarse time intervals.
+
+Richer data comes at a price: Data discovery and acquisition is more complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a quick tour of CensusMapper...
+
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+]
+
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;">
+]
+
+---
+## CensusMapper API Key
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up), and ideally install it using the `set_api_key` function with the `install=TRUE` option so it's always available and won't expose your API key when sharing code.
+
+```{r}
+# to install it for this sessions only (this key will expire)
+cancensus::set_api_key("CensusMapper_3e14bb538a70a948d416cbfeeda656f0")
+
+# to install it for future sessions (use for your own API key)
+# only need to do this once on our computer, it will automatically 
+# be available in all future R sessions on your machine
+#
+# cancensus::set_api_key("<your own API key>", install = TRUE) 
+```
+
+This API key will expire later today, for future use replace it with your own and set the `install=TRUE` option, this will install the API key as a system variable in your `.Renviron` and it's available in every R session and you won't expose your API key when sharing code. 
+
+---
+class: medium-code
+## Census data
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+pv <- c(lico_at="v_CA16_2573")
+poverty_data <- get_census("CA16", regions=list(CMA="24462"), vectors=pv, geo_format="sf", level="CT") 
+ggplot(poverty_data,aes(fill=lico_at/100)) +
+  geom_sf(size=NA) +  
+  labs(title="Montrèal share of children in poverty",fill=NULL,caption="StatCan Census 2016")
+```
+
+---
+class: medium-code
+## Adapting for other region
+```{r fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+poverty_data <- get_census("CA16", regions=list(CSD="3520005"), vectors=pv, geo_format="sf",level="CT") 
+g <- ggplot(poverty_data,aes(fill=lico_at/100)) +
+  geom_sf(size=NA) +  
+  labs(title="Toronto share of children in poverty",fill=NULL,caption="StatCan Census 2016")
+g
+```
+
+---
+class: medium-code
+## Styling (requires yet another API key for vector tile data)
+```{r fig.height=4.5, fig.width=8}
+library(mountainmathHelpers) # remotes::install_github("mountainMath/mountainmathHelpers")
+g + scale_fill_viridis_c(option = "inferno",labels=scales::percent) +
+  geom_water() +  geom_roads() + # this requires NextZen API key
+  coord_sf(datum = NA)
+```
+---
+# Mixing data sources
+Mixing data sources is hard, especially when dealing with spatial data.
+
+We should think of spatial units as denominators, with tabular data attached to those spatial units being numerators.
+
+If spatial units (denominators) match across datasets, it is easy to compare the tabular data (numerators). If spatial units don't match, things get complicated. And annoying.
+
+Simple example is LFS time series for CMAs. We don't have one long time series but several partially overlapping shorter time series. The reason is that CMA geography changes over time, so we can't directly compare data when geography (denominators) change.
+
+--
+
+We will look at three cases:
+
+* Mixing data when spatial units match
+* Mixing data when spatial units change but are *congruent*
+* Mixing data when spatial units are arbitrary
+
+---
+class: medium-code
+## Mixing census data with StatCan Tables
+The {cansim} package returns a geographic identifier `GeoUID` that matches census identifiers returned by {cancensus}. That makes matching data from those two data sources very easy.
+```{r fig.height=3.8, fig.width=8}
+get_census("CA16",regions=list(CMA="35535"),geo_format = 'sf',level="CT") %>%
+  left_join(get_cansim("11-10-0074") %>% select(GeoUID,`D-index`=VALUE), by="GeoUID") %>%
+  ggplot(aes(fill=`D-index`)) +
+  geom_sf(size=0.1) + scale_fill_viridis_c() +
+  coord_sf(datum=NA,xlim=c(-79.8,-79.15),ylim=c(43.6,43.8)) +
+  labs(title="Income divergence index", caption="StatCan table 11-10-0074")
+```
+
+
+---
+class: medium-code
+## Mixing census across census years
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+The best way to deal with this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).
+```{r}
+library(tongfen)
+```
+Tongfen uses that while the spatial units change, they are still *congruent*, that is they are derived from one another by a (generally short) series of split and join operation.
+]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code
+# Tongfen
+As a warmup we want to look at percentage point change in share of seniors between 2006 and 2016 at fine geographies. For this we need the number of seniors and the population in those years. And we need to build "metadata" that describes how to aggregate these variables to new regions. Tongfen has helper functions for this.
+
+
+```{r}
+meta <- meta_for_ca_census_vectors(c(seniors_CA16="v_CA16_2522",seniors_CA06="v_CA06_92")) %>%
+  bind_rows(meta_for_additive_variables(c("CA16","CA06"),"Population"))
+meta %>% knitr::kable()
+```
+
+---
+class: medium-code
+# Tongfen (Change in seniors in Victoria)
+```{r fig.height=3.5, fig.width=10}
+seniors_data <- get_tongfen_ca_census(list(CMA="59935"), meta, level="DA") %>%
+  mutate(change=seniors_CA16/Population_CA16-seniors_CA06/Population_CA06) %>%
+  mutate(c=mountainmathHelpers::pretty_cut(change,c(-Inf,seq(-0.2,0.2,0.05),Inf),format=scales::percent))
+ggplot(seniors_data,aes(fill=c)) +
+  geom_sf(size=0.1) + scale_fill_brewer(palette="PiYG", na.value="darkgrey") +
+  coord_sf(datum = NA,ylim=c(48.4,48.5),xlim=c(-123.6,-123.2)) + 
+  labs(title="Victoria percentage point change in seniors 2006-2016", fill=NULL)
+```
+
+---
+class: medium-code
+# TongFen with T1FF data
+T1FF taxfiler data is s rich source of demographic information, now available for census tracts. Variable naming is consistent across years, making it possible to programmatically assemble data.
+```{r}
+years <- seq(2004,2018)
+variables <- setNames(c(paste0("v_TX",years,"_607"),paste0("v_TX",years,"_786")),
+                      c(paste0("families_",years),paste0("lico_",years)))
+meta <-meta_for_ca_census_vectors(variables)
+
+low_income <- get_tongfen_ca_census(regions = list(CMA=59933), meta=meta, level="CT") %>%
+  mutate(`2004-2018`=lico_2018/families_2018-lico_2004/families_2004,
+         `2004-2011`=lico_2011/families_2011-lico_2004/families_2004,
+         `2011-2018`=lico_2018/families_2018-lico_2011/families_2011)
+```
+--
+```{r}
+head(meta)
+```
+
+---
+# Low income families from T1FF data
+```{r fig.height=3.5, fig.width=11}
+low_income %>% pivot_longer(starts_with("20")) %>% sf::st_sf() %>%
+  ggplot(aes(fill=value)) + facet_wrap("name") +
+  geom_sf(size=0.1) + scale_fill_gradient2(labels=scales::percent) +
+  coord_sf(datum=NA,xlim=c(-123.25,-122.8),ylim=c(49.1,49.35)) +
+  labs(title="Change in share of families in low income 2004-2018", fill=NULL,
+       caption="T1FF F-20 family file")
+```
+
+
+---
+class: medium-code
+# Mixing custom data with census data
+Grocery store data obtained from open street map, stored in a goggle sheet for easier access.
+```{r}
+yvr_grocery_stores <- googlesheets4::sheets_get("1fZRv7glKIb3VOCdeYOyKO1ZvZGyJ1ZArUaff6BX4-kM") %>%
+  googlesheets4::read_sheet("Grocery stores") %>%
+  sf::st_as_sf(coords=c("lon","lat"),crs=4326,agr="const")
+
+head(yvr_grocery_stores) %>% knitr::kable()
+```
+
+```{r}
+yvr_cts <- get_census("CA16", regions=list(CMA="59933"), level="CT", geo_format="sf",
+                      vectors=c(vismin_base="v_CA16_3954",vismin="v_CA16_3957")) %>%
+  mutate(vismin_share=vismin/vismin_base)
+```
+
+---
+# Visual inspection
+```{r fig.height=4, fig.width=7}
+ggplot(yvr_cts) +
+  geom_sf(aes(fill=vismin_share),size=0.1) +
+  geom_sf(data=yvr_grocery_stores, aes(color=type),size=5) +
+  scale_fill_viridis_c(option="inferno") + 
+  coord_sf(datum=NA,xlim=c(-123.38,-122.50),ylim=c(49.02,49.40))
+```
+
+---
+class: medium-code
+# Stores by Visible Minority Share in Neighbourhood
+We simply assign to each store the visible minority share of the census tract it's located in.
+```{r fig.height=3, fig.width=7}
+store_theme <- list(geom_violin(),
+                    ggbeeswarm::geom_beeswarm(),
+                    scale_y_continuous(labels=scales::percent),
+                    labs(title="Share visible minority in grocery store catchment",
+                         fill="Chain",x=NULL,y="Share visibile minority"))
+yvr_grocery_stores %>%
+  sf::st_join(yvr_cts) %>%
+  ggplot(aes(x=type,y=vismin_share,fill=type)) + store_theme
+```
+
+---
+class: medium-code
+# Refined method
+Look at 800m catchments, this requires estimating data to catchments. The {tongfen} package has functionality to do just that.
+
+```{r fig.height=3, fig.width=7}
+yvr_grocery_buffers <- yvr_grocery_stores %>%
+  sf::st_transform(3005) %>% # better coordinate system for distance calculations
+  sf::st_buffer(2000)  # 800m radius around stores
+
+yvr_grocery_vsimin <- tongfen_estimate(yvr_grocery_buffers,yvr_cts %>%  sf::st_transform(3005),
+                                       meta_for_additive_variables("",c("vismin","vismin_base"))) 
+
+yvr_grocery_vsimin %>% head(5) %>% knitr::kable() 
+```
+
+
+---
+class: medium-code
+# Refined method
+Looking at catchment area estimates rather than point-estimates gives a more refined picture of visible minority share near grocery stores, especially when stores are located at the edge of census tracts.
+
+```{r fig.height=3, fig.width=7}
+yvr_grocery_vsimin %>%
+  ggplot(aes(x=type,y=vismin/vismin_base,fill=type)) +
+  store_theme
+```
+
+---
+class: medium-code
+# Refining and streamlining the estimates
+The {cancensus} and {tongfen} packages have functionality to streamline these estimates. We can wrap everything into one call to query the census data and return estimates. This uses the {cancensus} `get_intersecting_geometries` function to determine which parts of Canada we need to query data from, fetches the data and performs the estimates.
+
+```{r fig.height=3, fig.width=7}
+yvr_grocery_vsimin_da <- yvr_grocery_buffers %>%
+  tongfen_estimate_ca_census(meta_for_ca_census_vectors(c(vismin_base="v_CA16_3954",vismin="v_CA16_3957")),
+                             level="DA",intersection_level = "CT")
+yvr_grocery_vsimin_da %>%
+  ggplot(aes(x=type,y=vismin/vismin_base,fill=type)) +
+  store_theme 
+```
+
+---
+## Summary on mixing data
+Mixing data sources is hard. There are some general steps to follow when mixing (spatial) data:
+
+* Need to pay attention to spatial units
+* If spatial units match, things are (relatively easy)
+* If spatial units don't match but are congruent, consider {tongfen}
+* If spatial units don't match and aren't congruent, need to estimate data
+
+--
+
+One big advantage when coding this kind of analysis in R is that we can come back and refine our work for deeper analysis.
+
+Often we will do an initial pass of comparing data from different sources, after which the hard work of making data comparable is done. We can then successively refine the work.
+
+We are closing with links to some examples.
+
+---
+background-image: url("https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time_files/figure-html/vancouver_income_map-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Income distribution
+
+## [How segreated are we by income? Opportunities for deeper analysis](https://doodles.mountainmath.ca/blog/2018/10/28/understanding-income-distributions-across-geographies-and-time/)
+
+---
+
+
+background-image: url("https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation_files/figure-html/vancouver_d_index-1.png")
+background-position: 50% 50%
+background-size: 100%
+class: center, bottom, inverse
+
+# Iterating
+## [With each analysis we gain insight, but also gain ability to ask better questions. And iterate by adapting the code for previous analysis to go deeper. Reproducible and adaptable workflows facilitate this.](https://doodles.mountainmath.ca/blog/2020/09/21/income-mixing-and-segregation/)
+
+
+
+
+
+---
+class: inverse center
+## Thanks for listening and coding along
+The RMarkdown for this presentation can be [found on GitHub](https://github.com/mountainMath/presentations/blob/master/cabe_workshop2.Rmd) if anyone wants to download the code and adapt it for their own purposes. 
+
+### Please post your questions in the chat.
+### .....<span class="blinking-cursor">|</span>
+
+<div style="height:10%;"></div>
+
+<hr>
+
+You can find me on Twitter at [@vb_jens](https://twitter.com/vb_jens).
+
+The [official {cancensus} documentations](https://mountainmath.github.io/cancensus/index.html) has documentation and examples for the {cancensus} package and the [official {tongfen} documentations](https://mountainmath.github.io/tongfen/index.html) has documentation and examples for the {tongfen} package.
+
+My blog has lots of examples with code. [doodles.mountainmath.ca](https://doodles.mountainmath.ca)
+
+In particular examples using [the {cancensus} package](https://doodles.mountainmath.ca/categories/cancensus/) and [the {tongfen} package](https://doodles.mountainmath.ca/categories/tongfen/)
+
+
+
+
