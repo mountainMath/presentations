@@ -153,13 +153,13 @@ ggplot(lfs_2021_bootstrap,aes(x=`Not currently employed, worked in the past`,y=s
 ---
 ## Web scraping
 
-<img src="images/vf.png" style="width:300px;float:right;padding-left:20px;"/>
+<img src="images/vf.png" style="width:370px;float:right;padding-left:20px;"/>
 Sometimes data is not easily available for download, but we can scrape it from the web. This is fairly straight-forward if the data is in an html table.
 
-As an example, let's look at the [Canadian COVID-19 vaccine delivery scheduel by PHAC](https://www.canada.ca/en/public-health/services/diseases/2019-novel-coronavirus-infection/prevention-risks/covid-19-vaccine-treatment/vaccine-rollout.html). It contains three tables, one for past distributions and one each for future Moderna and BioNTech/Pfizer distributions.
+As an example, let's look at the [Canadian COVID-19 vaccine delivery scheduel by PHAC](https://www.canada.ca/en/public-health/services/diseases/2019-novel-coronavirus-infection/prevention-risks/covid-19-vaccine-treatment/vaccine-rollout.html). It contains three tables, one for past distributions and one each for future Moderna and BioNTech/Pfizer distributions. Here is a sreenshot of the table for the expectged BioNTech/Pfizer distribution to the provinces.
 
 
-The current version of the {rvest} package makes this easy.
+The table is quite lean and the current version of the {rvest} package makes scraping tables like this easy.
 
 ```{r}
 library(rvest)
@@ -240,7 +240,7 @@ get_data_for_page <- function(page){
 }
 
 cl_data <-  lapply(seq(0,5),get_data_for_page) %>% bind_rows() %>%
-  mutate_all(function(d)gsub("( |\\n)+"," ",d) %>% gsub("^ | $| - $","",.))
+  mutate_all(function(d)gsub("( |\\n)+"," ",d) %>% gsub("^ | $| - $","",.)) 
 ```
 
 ---
@@ -257,8 +257,8 @@ cleaned_cl_data <- cl_data %>%
   mutate(Date=as.Date(paste0(Date," 2021"),format="%b %d %Y"),
          Bedrooms = str_extract(Housing,"\\d+br"),
          Size = str_extract(Housing,"\\d+ft2") %>% gsub("ft2","",.) %>% as.numeric,
-         Ask=gsub("\\$|,","",Price) %>% as.numeric) 
-head(cleaned_cl_data) %>% knitr::kable()
+         Ask=gsub("\\$|,","",Price) %>% as.numeric)
+head(cleaned_cl_data) %>% knitr::kable() 
 ```
 
 ---
@@ -268,8 +268,8 @@ class: medium-code
 ```{r fig.height=3.5, fig.width=8}
 cleaned_cl_data  %>%
   mutate(`Asking price per square foot` = Ask/Size) %>%
-  filter(Bedrooms %in% c("1br","2br","3br")) %>%
-  ggplot(aes(x=Bedrooms,y=`Asking price per square foot`)) +
+  filter(Bedrooms %in% c("1br","2br","3br"),`Asking price per square foot`<10) %>%
+  ggplot(aes(x=Bedrooms,y=`Asking price per square foot`)) + 
   geom_violin() +
   ggbeeswarm::geom_beeswarm() +
   scale_y_continuous(labels=function(d)paste0("$",d,"/sf")) +
@@ -343,7 +343,7 @@ Excel data is out there, whether we like it or not. Main problem: Not tidy.
 excel_tmp <- tempfile(fileext = ".xls")
 download.file("https://mountainmath.ca/data/2013_FAM_e.xls",excel_tmp)
 
-readxl::excel_sheets(excel_tmp)
+readxl::excel_sheets(excel_tmp) 
 ```
 
 ```{r}
@@ -367,14 +367,15 @@ Multi-line headers are evil. But nothing a couple of lines of code can't solve.
 ```{r}
 header <- readxl::read_excel(excel_tmp,col_names = FALSE,
                              n_max = 3,skip=1) %>%
-  t() %>% as.data.frame() %>% as_tibble()
+  t() %>% as_tibble(.name_repair="unique")
 header %>% head(18)
 ```
 ]
 .pull-right[
 ```{r}
-header <- header %>% fill(everything(),.direction="down")
-header %>% head(20)
+header <- header %>% 
+  fill(everything(),.direction="down")
+header %>% head(18)
 ```
 ]
 
@@ -386,7 +387,7 @@ Generally it's easiest to operate on columns, transposing exchanges rows and col
 ```{r}
 header <- readxl::read_excel(excel_tmp,col_names = FALSE,n_max = 3,skip=1) %>%
   t() %>% as.data.frame() %>%
-  fill(matches("V"),.direction="down") %>%
+  fill(everything(),.direction="down") %>%
   t() %>% as.data.frame() %>%
   summarise_all(function(d) d %>% na.omit() %>% paste0(collapse = " - ")) %>%
   unlist(use.names=FALSE)
@@ -419,7 +420,7 @@ excel_data <- excel_data %>%  slice(seq(1,na_rows[1]-1))
 class: medium-code medium-font
 ## Excel data (working with cleaned data)
 
-```{r fig.height=4, fig.width=10}
+```{r fig.height=3.5, fig.width=10}
 excel_data %>% 
   pivot_longer(matches("^Couple Families .* Median employment income$")) %>%
   mutate(name=gsub("Couple Families - | - Median employment income","",name)) %>%
@@ -428,7 +429,7 @@ excel_data %>%
   coord_flip() +
   scale_y_continuous(labels=scales::dollar) +
   labs(title="Coupld families single and dual earners", fill=NULL,
-       y="Employment income",x=NULL,caption="T1FF Taxfilers")
+       y="Employment income",x=NULL,caption="T1FF Taxfilers 2013")
 ```
 
 ---
