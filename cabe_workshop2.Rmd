@@ -166,6 +166,7 @@ The best way to deal with this is a semi-custom tabulation that can produce stan
 
 But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).
 ```{r}
+# remotes::install_github("mountainmath/tongfen")
 library(tongfen)
 ```
 Tongfen uses that while the spatial units change, they are still *congruent*, that is they are derived from one another by a (generally short) series of split and join operation.
