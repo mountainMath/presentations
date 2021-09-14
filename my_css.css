@@ -2,8 +2,14 @@
 .small-code .remark-code {font-size: 12px;}
 .medium-code .remark-code {font-size: 14px;}
 .short-title h1 {margin-bottom: 0;}
+.short-title h2 {margin-bottom: 0;}
 .single-line p {display:inline;padding:0;}
-
+.width30 {width:28%}
+.width70 {width:68%}
+.width40 {width:38%}
+.width60 {width:58%}
+.width45 {width:43%}
+.width55 {width:53%}
 .small-font {font-size: 12px;}
 .medium-font {font-size: 14px;}
 

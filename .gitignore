@@ -5,3 +5,12 @@
 /*_cache/*
 /can_bc_future_housing_supply_affordability*
 /cabe-overflow.Rmd
+*.html
+*_files/
+*_files/*
+*_overflow.Rmd
+libs
+libs/*
+data/
+data/*
+update_presentations.sh
