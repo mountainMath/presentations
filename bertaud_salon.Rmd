@@ -1,7 +1,7 @@
 ---
 title: "Alain Bertaud Public Salon"
 author: "Jens von Bergmann"
-subtitle: "(Mis-) Planning Vancouver"
+subtitle: "Population, Planning, and Opportunity Cost in Vancouver"
 date: "2021-09-20"
 output:
   xaringan::moon_reader:
@@ -131,7 +131,7 @@ census_data <- bind_rows(metro_pop_dw_2016 %>%
 
 class: short-title
 ## Population, growth, and distribution
-<iframe src="https://doodles.mountainmath.ca/html/yvr_pop_timeline" width="100%" height="550px">
+<iframe src="https://doodles.mountainmath.ca/html/yvr_pop_timeline" width="100%" height="530px">
 
 
 ---
@@ -178,7 +178,7 @@ Each individual municipality's population grew in line with it's respective dwel
 ---
 class: short-title
 ## What caused this growth pattern?
-<iframe src="https://mountainmath.ca/zoning_map" width="100%" height="550px">
+<iframe src="https://mountainmath.ca/zoning_map" width="100%" height="530px">
 
 ---
 ## How do we enforce low density?
@@ -216,12 +216,12 @@ This 1980 newspaper clipping captures the dynamic of NIMBY pushback spurring the
 
 .pull-right.width40[
 #### This is what people tried to prevent
-<img src="images/skinny-house.png" width="90%">
+<img src="images/skinny-house.png" width="80%">
 ]
 ---
 ## How much damage does this do?
-Just in the City of Vancouver alone, halfing the minimum frontage/area requirements would unlock $43 billion of the opportunity cost that comes with preventing the sharing of land in jobs and amenity rich areas.
+Just in the City of Vancouver alone, halfing the minimum frontage/area requirements would unlock **$43 billion of the opportunity cost** that comes with preventing the sharing of land in jobs and amenity rich areas.
 
-<img src="https://doodles.mountainmath.ca/blog/2021/07/25/lots-of-opportunity-estimating-the-zoning-tax-in-vancouver/index_files/figure-html/zoning-tax-2-1-1.png" height="500px" style="margin-top:-50px">
+<img src="https://doodles.mountainmath.ca/blog/2021/07/25/lots-of-opportunity-estimating-the-zoning-tax-in-vancouver/index_files/figure-html/zoning-tax-2-1-1.png" height="500px" style="margin-top:-25px;">
 
 
