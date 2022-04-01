@@ -1,0 +1,307 @@
+---
+title: "What's it like to be an independent Data Science consultant"
+subtitle: Stat 550
+author: "Jens von Bergmann"
+date: "2022-03-31"
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      ratio: '16:10'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	cache = TRUE,
+	dev="svg"
+)
+options(htmltools.dir.version = FALSE)
+library("knitr")
+library("utils")
+library(tidyverse)
+library(cancensus)
+library(cansim)
+library(tongfen)
+
+options(servr.daemon = TRUE)
+```
+
+```{r broadcast, echo=FALSE}
+xaringanExtra::use_broadcast() 
+```
+
+## An opinionated view on Data Science Consulting
+
+Disclaimer:
+
+* I am not a statistician
+--
+
+Background:
+
+* Ph.D. in Mathematics
+* Undergraduate degrees in Physics and Computer Science
+
+--
+
+What I do now:
+
+I work broadly on housing, demographics and transportation, focused on data infrastructure, analysis, and data visualization/communication.
+
+--
+
+Plus random things.
+
+???
+I know Daniel through work on Covid.
+
+---
+
+## My toolkit
+I am mostly interesting in Canadian data, and have developed an ecosystem of data storage, acquisition, and analysis infrastructure to facilitate this.
+
+Tools:
+* R (my preferred tool for analysis, visualizations and reports)
+* python (sometimes python is a better fit)
+* javascipt (for interactive web-based visualization and communication purposes)
+* PostgreSQL/PostGIS, Ruby on Rails for backend data infrastructure
+
+---
+## Census data
+Census data offers rich variables and fine spatial resolution, but at coarse time intervals.
+
+Rich data comes at a price: Data discovery and acquisition is more complex. Enter [CensusMapper](https://censusmapper.ca).
+
+CensusMapper is a flexible census data mapping platform. Anyone can explore and map census data.
+
+CensusMapper is also an API server to facilitate data acquisition for analysis, as a [GUI data selection tool](https://censusmapper.ca/api).
+
+--
+
+We will take a [quick tour of CensusMapper](https://censusmapper.ca)...
+
+---
+# cancensus
+.pull-left[
+The cancensus R package interfaces with the CensusMapper API server. It can be queried for
+- census geographies
+- census data
+- hierarchical metadata of census variables
+- some non-census data that comes on census geographies, e.g. T1FF taxfiler data
+
+A slight complication, the [`cancensus` package](https://mountainmath.github.io/cancensus/) needs an API key. You can sign up for one on [CensusMapper](https://censusmapper.ca/users/sign_up).
+]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png" alt="cancensus" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code 
+## cancensus example 
+```{r echo=TRUE, fig.height=3.5, fig.width=5.5}
+get_census("CA16",regions=list(CSD="5915022"),vectors=c(lico="v_CA16_2570"), level="DA", geo_format = 'sf') %>%
+  ggplot(aes(fill=lico/100)) +
+  geom_sf(size=0.1) +
+  scale_fill_viridis_c(labels=scales::percent) +
+  coord_sf(datum=NA) +
+  labs(title="Population in low income (LICO-AT)",fill=NULL,caption="StatCan Census 2016")
+```
+
+
+---
+# cansim
+.pull-left[
+The [`cansim` R package](https://mountainmath.github.io/cansim/) interfaces with the StatCan NDM that replaces the former CANSIM tables. It can be queried for
+- whole tables
+- specific vectors
+- data discovery searching through tables
+
+It encodes the metadata and allows to work with the internal hierarchical structure of the fields.
+]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/cansim/master/images/cansim-sticker.png" alt="cansim" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code 
+## cansim example 
+```{r echo=TRUE, fig.height=2.5, fig.width=7.5}
+mv_data <- get_cansim_sqlite("20-10-0001") %>%
+  filter(GEO=="Canada",
+         `Vehicle type`!="Total, new motor vehicles",
+         `Origin of manufacture`=="Total, country of manufacture",
+         Sales=="Units",
+         `Seasonal adjustment`=="Unadjusted") %>%
+  collect_and_normalize(disconnect = TRUE) 
+ggplot(mv_data,aes(x=Date,y=val_norm,color=`Vehicle type`)) +
+  theme_light() +
+  geom_line(alpha=0.2) + 
+  geom_smooth(span=0.1) + 
+  scale_y_continuous(labels=function(d)scales::comma(d,scale=1/1000,suffix="k")) +
+  labs(title="Canadian new motor vehicle sales",x=NULL,y="Sales per month",
+       caption="StatCan Table 20-10-0001")
+```
+
+---
+## Various other tools for Canadian data
+
+* [canbank package](https://mountainmath.github.io/canbank/index.html) for access to Bank of Canada data
+* [cmhc package](https://mountainmath.github.io/cmhc/index.html) for access to CMHC housing data
+* [canpumf package](https://mountainmath.github.io/canpumf/index.html) for working with StatCan Public Use Microdata Files
+
+Plus a loose collection of databases and tools to work with custom data like scraped rental listings data, short term rental data and other custom data sources.
+
+---
+# The changing geographies problem
+.pull-left[Census geographies change over time, which complicates comparisons over time.
+
+The higher frequency tables (CANSIM) split the timelines along census geographies, with overlap to facilitate splicing them together.
+
+A better way to do this is a semi-custom tabulation that can produce standard census variables on uniform geographies across multiple censuses (back to 1971).
+
+But that takes time, costs money and is overkill for many applications. An immediate way to achieve almost the same result is [`tongfen`](https://mountainmath.github.io/tongfen/).]
+.pull-right[
+<img src="https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png" alt="tongfen" style="height:500px;margin-top:-80px;">
+]
+
+---
+class: medium-code 
+## tonfen example 
+```{r echo=TRUE, fig.height=3.5, fig.width=7.5, message=FALSE, warning=FALSE}
+meta=meta_for_ca_census_vectors(c(lico_2016="v_CA16_2570",lico_2006="v_CA06_1981"))
+get_tongfen_ca_census(regions=list(CMA="5915022"),meta,level="DA") %>%
+ggplot(aes(fill=(lico_2016-lico_2006)/100)) +
+  geom_sf(size=0.1) +
+  scale_fill_gradient2(labels=scales::percent) +
+  coord_sf(datum=NA) +
+  labs(title="Change in population in low income (LICO-AT)",
+       fill="Percentage\npoint change\n2006-2016", caption="StatCan Census 2006,2016")
+```
+
+
+---
+## What does my work look like?
+
+Mostly working with various levels government, but sometimes also private entities.
+
+#### Examples
+* Backend work and reporting tools for a bike share system.
+* Data work to support planning initiatives at the municipal level
+* Analysis and public communication tools for housing related issues at the provincial level
+* Canada-wide risk metrics at very granular spatial levels, and risk communication
+* Regional housing/planning related data gathering, processing, standardizing, analyzing, and visualizing
+* Academic research in cooperation with university researchers
+* Building and optimizing data infrastructure used in private companies
+
+
+
+---
+background-image: url("https://mountainmath.ca/ns_cap_cover.png")
+class: center, bottom, inverse
+
+# [Nova Scotia CAP analysis](https://mountainmath.ca/ns_cap)
+
+---
+background-image: url("https://mountainmath.ca/assets/teardown-index-2f04be0bfa145dab29fb41b4c7f8634941a2146f76a1209b484beddae2c9f3b1.png")
+class: center, bottom
+
+# [Teardown index](https://mountainmath.ca/teardowns)
+
+
+---
+background-image: url("https://mountainmath.ca/images/yvr_zoning_map.png")
+class: center, bottom, inverse
+
+# [Metro Vancouver Zoning Project](https://mountainmath.ca/zoning_map)
+
+---
+## How to stay organized?
+
+My approach:
+* Only work on projects I am interested in/get excited about.
+* git for everything.
+* Everything is scripted, no manual tinkering unless absolutely necessary.
+* Use notebooks (Rmarkdown, Jupyter, Quarto, etc) throughout.
+* If I use code twice, turn it into a function.
+* If I use code in several places in a project, put it into a separate script file and source it.
+* If I use code across projects, turn it into a package.
+* Structure complex project workflows using workflow management packages like {targets}.
+* As deliverables, turn over all code with the finished product.
+
+--
+
+**But why give away the code, even if nobody asked for it?**
+* Keeps me honest.
+* Gives the client assurances and accountability.
+* Most people overvalue the IP/value of their code. It's just code.
+* Having the code enables clients to tinker a little, but they will come back if they need more work done. There is a reason they hired an outside person in the first place.
+
+---
+## Examples of my workflow
+In my spare time when exploring or deepening my understanding of a particular dataset, or when there are policy-relevant parts of work I do that I can spin off, [I write blog posts](https://doodles.mountainmath.ca). There I follow my general workflows and always publish the code.
+
+Here is one such example, [analyzing how much value is lost by minimum lot size requirements for single family homes](https://doodles.mountainmath.ca/blog/2021/07/25/lots-of-opportunity-estimating-the-zoning-tax-in-vancouver/). 
+
+---
+## Biggest challenges
+
+* Subject matter knowledge, understanding the data generation process. 
+--
+
+  * For descriptive stats using census data this might just mean to read the data dictionary, read the formulation of the question in the questionnaire, familiarize yourself with changes in concepts over time. 
+  * For StatCan economic tables it means understanding the definitions and underlying economic concepts. 
+  * For modelling it means understanding the mechanics of the data generation process and choose appropriate methods and do appropriate pre-processing of the data and feature engineering.
+--
+
+* Interfacing with people who use Excel.
+
+* Data cleaning
+
+---
+## Outlook
+
+### Directions I anticipate spending more time on
+
+* **Causal inference and counterfactual analysis**, paying closer attention to data generation processes and provide robust causal and counter-factual estimates.
+* **Spatial data analysis tools**, spatial data analysis is still quite under-developed. Obstacles that I run into regularly include
+  - ecological inference problems, spatial multilevel models,
+  - spatial autocorrelation, both as an obstacle when running analysis and as an opportunity during spatial interpolation.
+* **Agent-based micro-simulation** modelling, analysis, and prediction.
+* **Client-side interactive modelling**, for example [evaluating a neural net in the browser](https://mountainmath.ca/hpe).
+
+--
+ 
+#### There are lots of opportunities/directions, the landscape is still wide open and moving fast.
+
+* Doing independent data consulting work is not for everyone. 
+* Cutting your teeth in industry for a while is always a good investment.
+* Keep learning new things!
+
+---
+class: center, middle, inverse
+### Thanks for bearing with me. 
+
+These slides are online at https://mountainmath.ca/stat_550 and the R notebook that generated them includes the code that pulls in the data and made the graphs and [lives on GitHub](https://github.com/mountainMath/presentations/blob/master/stat_550.Rmd).
+
+<div style="height:5%;"></div>
+
+<hr>
+
+You can find me on Twitter at [@vb_jens](https://twitter.com/vb_jens) or (occasionally) on [Linkedin](https://www.linkedin.com/in/vb-jens/).
+
+My blog has lots of examples with code. [doodles.mountainmath.ca](https://doodles.mountainmath.ca)
+In particular 
+
+
+
+
+

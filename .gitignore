@@ -14,3 +14,4 @@ libs/*
 data/
 data/*
 update_presentations.sh
+.DS_Store

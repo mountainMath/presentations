@@ -66,7 +66,7 @@ get_2011_base_projections <- function(){
 metro_van_region_projections <- simpleCache(get_2011_base_projections(),
                                             "metro_van_pop_dw_projections_2011.Rda") %>%
   rename(Name=MUNICIPALITY) %>%
-  mutate(Name=case_when(Name=="Langley Township" ~ "Langley Disrtict",
+  mutate(Name=case_when(Name=="Langley Township" ~ "Langley District",
                         TRUE ~ Name)) %>%
   group_by(Name,Metric) %>%
   mutate(rate=(lead(Value, order_by = Year)/Value)^(1/10)) %>%
@@ -131,7 +131,7 @@ census_data <- bind_rows(metro_pop_dw_2016 %>%
 
 class: short-title
 ## Population, growth, and distribution
-<iframe src="https://doodles.mountainmath.ca/html/yvr_pop_timeline" width="100%" height="530px">
+[![](https://doodles.mountainmath.ca/images/van_pop_change_3d.png)](https://doodles.mountainmath.ca/html/yvr_pop_timeline)
 
 
 ---
@@ -178,7 +178,7 @@ Each individual municipality's population grew in line with it's respective dwel
 ---
 class: short-title
 ## What caused this growth pattern?
-<iframe src="https://mountainmath.ca/zoning_map" width="100%" height="530px">
+[![](images/metro-van-zoning-map.png)](https://mountainmath.ca/zoning_map)
 
 ---
 ## How do we enforce low density?
@@ -201,11 +201,11 @@ Today I want to focus on the last one, minimum frontage and lot size requirement
 ]
 
 ---
+class: short-title
 ## How did we end up with these rules?
 
-
 .pull-left.width60[
-In the 70s and 80s housing pressure in Vancouver shifted and increasingly people eanted to subdivide existing lots. Minimum frontage/size requirements became binding across Vancouver. 
+In the 70s and 80s housing pressure in Vancouver shifted and increasingly people tried to subdivide existing lots. Minimum frontage/size requirements became binding across Vancouver. 
 
 ![](images/thin-house-newspaper.png)
 
@@ -216,12 +216,16 @@ This 1980 newspaper clipping captures the dynamic of NIMBY pushback spurring the
 
 .pull-right.width40[
 #### This is what people tried to prevent
-<img src="images/skinny-house.png" width="80%">
+<img src="images/skinny-house.png" width="90%">
 ]
 ---
+class: short-title
 ## How much damage does this do?
-Just in the City of Vancouver alone, halfing the minimum frontage/area requirements would unlock **$43 billion of the opportunity cost** that comes with preventing the sharing of land in jobs and amenity rich areas.
+Just in the City of Vancouver alone, halving the minimum frontage/area requirements would [**unlock $43 billion of the opportunity cost**](https://doodles.mountainmath.ca/blog/2021/07/25/lots-of-opportunity-estimating-the-zoning-tax-in-vancouver/) that comes with preventing the sharing of land in jobs and amenity rich areas.
 
-<img src="https://doodles.mountainmath.ca/blog/2021/07/25/lots-of-opportunity-estimating-the-zoning-tax-in-vancouver/index_files/figure-html/zoning-tax-2-1-1.png" height="500px" style="margin-top:-25px;">
+<img src="https://doodles.mountainmath.ca/blog/2021/07/25/lots-of-opportunity-estimating-the-zoning-tax-in-vancouver/index_files/figure-html/zoning-tax-2-1-1.png" height="530px" style="margin-top:-25px;">
 
-
+---
+class: short-title
+## Vancouver area commute patterns
+<iframe width="900px" height="530px" src="https://flowmap.blue/13Q-xsfL59XXPw7-3ue_9G9xab9FtYiL3S9vOZp-yJyY/embed?v=49.223692,-122.941214,9.39&a=1&b=1&c=1&d=1&lt=1&col=Default&f=45" frameborder="0" allowfullscreen></iframe>
