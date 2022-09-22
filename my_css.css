@@ -15,6 +15,8 @@
 .small-font {font-size: 12px;}
 .medium-font {font-size: 14px;}
 
+.letter-list ol { list-style-type: lower-alpha; }
+
 .blinking-cursor {
   font-weight: 100;
   font-size: 30px;

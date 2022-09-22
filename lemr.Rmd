@@ -1,0 +1,226 @@
+---
+title: "How to analyze data"
+subtitle: "LEMR Workshop Series"
+author: "Jens von Bergmann"
+date: "2022-09-22"
+output:
+  xaringan::moon_reader:
+    chakra: libs/remark-latest.min.js
+    lib_dir: libs
+    css: ["default","default-fonts","my_css.css"]
+    nature:
+      beforeInit: "macros.js"
+      ratio: '16:10'
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+library(cancensus)
+library(tidyverse)
+```
+
+# Overview
+
+We have a lot of data, and it's increasingly easily accessible. What's lacking most right now is analysis. We want to quickly recall the basic data analysis workflow and work through one housing-related example.
+
+---
+## Step 1: Formulating the question
+
+What is the question we are interested in? Asking a clear question will help focus our efforts and ensure that we don't aimlessly trawl through data.
+--
+
+## Step 2: Identifying possible data sources
+
+Here we try to identify data sources that can speak to our question. We will also take the time to read up on definitions and background concepts to better understand the data and prepare us for data analysis, and understand how well the concepts in the data match our original question from step 1.
+
+
+## Step 3: Data acquisition
+
+In this step we will import the data into our current working session. This could be as simple as an API call, or more complicated like scraping we table from the web, or involve even more complex techniques to acquire the data.
+
+---
+## Step 4: Data preparation
+
+In this step we will reshape and filter the data to prepare it for analysis.
+
+--
+## Step 5: Analysis
+This step could be as simple as computing percentages or even doing nothing, is the quantities we are interested in already come with the dataset, if our question can be answered by a simple descriptive analysis. In other cases, when our question is more complex, this step may be much more involved.
+
+--
+## Step 6: Visualization
+The final step in the analysis process is to visualize and communicate the results. In some cases this can be done via a table or a couple of paragraphs of text explaining the results, but in most cases it is useful to produce graphs or maps or even interactive visualizations to effectively communicate the results.
+
+---
+## Step 7: Interpretation
+What's left to wrap this up is to interpret the results. How does this answer our question, where does it fall short. What does this mean in the real-world context? What new questions emerge from this?
+
+---
+## Example
+
+We want to work through a simple example to understand how this works in practice. To start off we ask a question. 
+
+## Step 1: Question
+#### How many empty homes do we have in Canada?
+
+--
+## Step 2: Identifying possible data sources
+
+There are several data sources that can speak to this. The Census has information about dwellings and households, the difference, dwellings without households, might be thought of as "empty" homes (a.k.a "dwellings not occupied by usual residents"). More directly, with various Empty Homes Taxes in different parts of Canada we have some administrative data on homes deemed to be empty and taxed or empty and exempt from taxes.
+
+---
+## Step 2 continued: Definitions
+
+For the census, the [usual place of residence is defined in the census dictionary](https://www12.statcan.gc.ca/census-recensement/2021/ref/dict/az/Definition-eng.cfm?ID=pop126), it refers to the "main dwelling in which the person lives most of the time". For students who return to live with their parents during the year the usual place of residence is their parent's place. Dwellings "not occupied by usual residents" are dwellings that are either unoccupied on census day or occupied by temporarily present people who have their usual residence elsewhere.
+
+Data for [Vancouver's Empty Homes Tax](https://vancouver.ca/files/cov/vancouver-2021-empty-homes-tax-annual-report.pdf) or the [BC Speculation and Vacancy tax](https://news.gov.bc.ca/files/SVT_Detailed_Data_2020.pdf) categorize homes that are considered occupied or unoccupied, the latter category is split into exempt and taxed homes. To be considered occupied homes have to be lived in at least 6 months of the year. As opposed to the census the EHT and SVT consider legal properties as base, not dwelling units.
+
+These two concepts measure very different things. We need to **refine our question** to decide what exactly we mean by "empty" homes.
+
+---
+class: letter-list
+## Step 1 revisited: Refining the question
+Before we can proceed we need to decide what "empty" should mean. Are we interested in 
+
+
+1. homes empty on census day, or 
+2. homes considered empty for at least 6 months of the year?
+
+--
+<div style="margin-top:50px;"></div>
+
+In casual housing discussions these two notions get often used interchangeably, so let's have a look at both.
+
+<img src="https://media2.giphy.com/media/3o7aCRloybJlXpNjSU/giphy.gif?cid=ecf05e47qwqq9diyjd4fb92c6c51dttg07s185m8xloyhadm&rid=giphy.gif&ct=g"/>
+
+---
+class: small-code short-title
+## Step 3a: Data acquisition
+Data acquisition of census data is easy, we can get it from StatCan or the CensusMapper API.
+
+```{r}
+data_for_year <- function(year){
+  ds <- paste0("CA",substr(year,3,4))
+  get_census(ds,regions=list(C="01"),
+             vectors = setNames(paste0("v_",ds,"xSD_",c(19,28)),
+                                c("Temporary","Unoccupied"))) |>
+      mutate(Year=year)
+}
+
+data <- seq(2006,2016,5) |> 
+  lapply(data_for_year) |> 
+  bind_rows() |>
+  bind_rows(
+    get_census("CA21",regions=list(C="01")) |>
+      mutate(`Not occupied by usual residents`=Dwellings-Households, Year=2021)
+  ) |>
+  select(Year,Dwellings, Households, Temporary, Unoccupied, `Not occupied by usual residents`)
+
+knitr::kable(data)
+```
+
+---
+## Step 4a/5a: Data perparation and Analysis
+There is not much left to do here, we can pivot the data to long form, compute percentages, and add in a column for overall counts of dwellings not occupied by usual residents.
+
+```{r}
+plot_data <- data |>
+  pivot_longer(c("Not occupied by usual residents",
+                 "Temporary","Unoccupied")) |>
+  filter(!is.na(value)) |>
+  mutate(Total=Dwellings-Households,
+         Share=value/Dwellings) 
+```
+
+This makes it easy to visualize the data.
+
+---
+class: small-code short-title
+## Step 6a: Visualization
+```{r fig.height=3, dpi=300}
+ggplot(plot_data,aes(x=Year,y=Share,fill=name)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(y=Total/Dwellings, label=scales::comma(Total)), vjust=-1) +
+  scale_y_continuous(labels=scales::percent) +
+  expand_limits(y=0.1) +
+  labs(title="Dwellings not occupied by usual residents in Canada",
+       fill=NULL,x=NULL,y="Share of dwellings",
+       caption="StatCan Census 2006 through 2021")
+```
+
+---
+## Step 7a: Interpretation
+What does this mean? Dwellings can be empty for many reasons, primarily when people move dwellings are often empty for a period of time. The Canadian census does not try to determine the reason why homes are not occupied, but a look across the border might shed some light onto this question.
+
+<img src="https://doodles.mountainmath.ca/posts/2020-01-27-mythical-oversupply_files/figure-html/unnamed-chunk-22-1.png" height="400px"/>
+
+---
+## Step 7a: Interpretation (continued)
+While the homes not occupied by usual residents, or with a custom tabulation the unoccupied homes, is an easy statistic to access, it is not a good indication of problematic vacancies. However, it is often used this way by people with only a shallow understanding of housing data.
+
+---
+## Step 2b 3b,4b,5b
+The BC Speculation and Vacancy Tax data probably gives the best indication of problematic vacancies across several BC municipalities. The data is available for the tax years 2018 through [2020](https://news.gov.bc.ca/files/SVT_Detailed_Data_2020.pdf), and it mixes homes that are unoccupied and not exempt with "satellite families". To a large extent those two can be separated. Data acquisition requires scraping it out of the PDF reports, which we will skip for this talk.
+
+For the interested reader a detailed analysis with code to reproduce it is [availabe on our blog](https://doodles.mountainmath.ca/blog/2021/11/21/three-years-of-speculation-vacancy-tax-data/).
+
+The data covers declarations, there have been some minor changes posted in later versions due to audits and late declarations, revisions have generally adjusted the number of homes deemed to be problematic vacancies downward.
+
+---
+## Step 6b
+The share of problematic vacancies ranges between less than half a percent up to around two percent.
+
+<img src="https://doodles.mountainmath.ca/blog/2021/11/21/three-years-of-speculation-vacancy-tax-data/index_files/figure-html/municipal-breakdown-non-exempt-1.png" height="400px"/>
+
+---
+## Step 6b (continued)
+The data also covers exemptions, that is homes that have been vacant for more than 6 months in the tax year but are exempted from the tax. Most exemptions are either recently sold homes or homes under construction or renovation. Properties without residences on them are also exempted.
+
+<img src="https://doodles.mountainmath.ca/blog/2021/11/21/three-years-of-speculation-vacancy-tax-data/index_files/figure-html/exemptions-overview-1.png" height="400px"/>
+
+---
+## Step 7b: Interpretation
+Empty homes as measured by the SVT show low (and dropping) shares of problematic vacancies. Tax rates in the first year were low, but it stands to reason that some people already sold or rented out previously empty homes before the tax hit. 
+So we can conclude that the statistic reflects the level of problematic vacancies right now, but not necessarily in previous years.
+
+---
+## Step 7: Interpretation (combined a/b)
+For the City of Vancouver we can compare the census estimate of homes not occupied by usual residents, the City Empty Homes Tax and the provincial Speculation and Vacancy tax data.
+
+.pull-left[
+<img src="https://doodles.mountainmath.ca/blog/2022/02/14/unoccupied-canada/index_files/figure-html/census-eht-svt-share-1.png" height="400px"/>
+]
+.pull-right[
+This gives an overview over how the different metrics relate. Census unoccupied by usual residents has been around 8%, vacant homes as identified by the EHT at around 2%, with problematic vacancies around 1%.
+
+The two data sources differ in what they cover. While the Census covers all dwelling units, the SVT covers properties. A rental building with several rental units is considered a single property. Similarly, a SFH with a suite (and/or a laneway house) is considered a single property and is registered as occupied if at least one of the units is occupied.
+
+Code for this graph, and more background information is [on my blog](https://doodles.mountainmath.ca/blog/2022/02/14/unoccupied-canada/).
+]
+
+---
+## Takeaway
+#### What does a data analysis workflow look like?
+
+* Have a clear question.
+* Find data to speak to that question, paying attention to definitions and how well the data matches the question.
+* Acquire the data and analyse it.
+* Visualize it or produce other output of the data to answer the question and communicate the results.
+* Interpret and contextualize the result, and point out limitations, so it's understandable to people who aren't as familiar with the data.
+
+Some of these steps may be repeated and refined along the way. 
+
+Ideally the workflow should be fully reproducible, with the code published along with the analysis so anyone can see exactly how it was done. And adapt it for making refinements or adding their own perspective. 
+
+Data is not neutral and data analysis is not neutral. The more different perspectives contribute to data analysis the better.
+
+
+
+
