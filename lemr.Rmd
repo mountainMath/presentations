@@ -40,7 +40,7 @@ What is the question we are interested in? Asking a clear question will help foc
 
 Here we try to identify data sources that can speak to our question. We will also take the time to read up on definitions and background concepts to better understand the data and prepare us for data analysis, and understand how well the concepts in the data match our original question from step 1.
 
-
+--
 ## Step 3: Data acquisition
 
 In this step we will import the data into our current working session. This could be as simple as an API call, or more complicated like scraping we table from the web, or involve even more complex techniques to acquire the data.
