@@ -315,7 +315,7 @@ ggplot(plot_data, aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="
   facet_wrap("City",nrow=1, scales="free_x") + age_pyramid_styling
 ```
 
-At the municupal and sub-municipal geography migration effects dominate the shape of the age distribution.
+At the municipal and sub-municipal geography migration effects dominate the shape of the age distribution.
 
 ---
 # Measuring access to healthcare and spatial mismatch
