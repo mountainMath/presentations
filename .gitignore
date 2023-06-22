@@ -15,3 +15,5 @@ data/
 data/*
 update_presentations.sh
 .DS_Store
+rsconnect/*
+revealjs-clean-demo/*
