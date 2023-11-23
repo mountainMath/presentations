@@ -1,0 +1,603 @@
+---
+title: "A brief introduction to causality"
+author: "Jens von Bergmann"
+format: revealjs
+editor: visual
+fontsize: 18pt
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(kableExtra)
+```
+
+In statistics we learn about correlation and regression as tools to understand the relationship between variables.
+
+But we are often interested in causality, not just correlation.
+
+What's the difference and how can we get to causation?
+
+. . .
+
+I will give a very brief and incomplete overview over how to get to causality.
+
+# Simpson's paradox
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+
+Suppose we get results of a drug trial that looks like this: 
+
+```{r}
+data <- tribble(~Gender,~Treatment,~Outcome,~Count,
+                "Men","Drug","Recovered",81,
+                "Men","Drug","Not recovered",87-81,
+                "Men","No drug","Recovered",234,
+                "Men","No drug","Not recovered",270-234,
+                "Women","Drug","Recovered",192,
+                "Women","Drug","Not recovered",263-192,
+                "Women","No drug","Recovered",55,
+                "Women","No drug","Not recovered",80-55)  |>
+  mutate(Treatment=factor(Treatment,levels=c("No drug","Drug")),
+         Outcome=factor(Outcome,levels=c("Not recovered","Recovered")),
+         Gender=factor(Gender,levels=c("Men","Women")))
+
+data |>
+  summarize(Count = sum(Count), .by=c(Treatment,Outcome)) |>
+  mutate(Percent = Count/sum(Count),.by=Treatment) |>
+  mutate(Count=paste0(Count," (",scales::percent(Percent),")")) |>
+  arrange(Treatment) |>
+  select(-Percent) |>
+  pivot_wider(names_from=Treatment,values_from=Count) |>
+  kbl() |>
+  kable_paper("hover", full_width = F) |>
+  row_spec(2, extra_css = "border-bottom: 1px solid") 
+```
+
+(Example taken from J. Pearl et al, Causal Inference in Statistics: A Primer)
+
+:::
+
+::: {.column width="50%"}
+
+```{r}
+pd <- data |>
+  summarize(Count = sum(Count), .by=c(Treatment,Outcome)) |>
+  uncount(Count)
+pd |> 
+  ggplot(aes(x=Treatment,y=Outcome)) +
+  geom_jitter(width=0.1,height=0.1,size=0.5,shape=21) +
+  geom_smooth(method="lm",formula=y~x,se=F,aes(group=1)) +
+  labs(x=NULL,y=NULL,title="Regression line")
+```
+
+```{r}
+lm(Outcome ~ Treatment, data=pd |> mutate(Outcome=Outcome=="Recovered")) |>
+  summary() |>
+  broom::tidy() |>
+  kbl() |>
+  kable_paper("hover", full_width = F)
+```
+
+:::
+
+::::
+
+# Simpson's paradox (continued)
+Suppose we also recorded the gender of the patients and results split by gender like this:
+
+
+
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+data %>%
+  bind_rows(summarise(.,Count=sum(Count),.by=c(Treatment,Outcome)) |>
+              mutate(Gender="Combined data")) |>
+  mutate(Percent = Count/sum(Count),.by=c(Gender,Treatment)) |>
+  mutate(Count=paste0(Count," (",scales::percent(Percent),")")) |>
+  select(-Percent) |>
+  mutate(Gender=factor(Gender,levels=c("Men","Women","Combined data"))) |>
+  arrange(Gender) |>
+  pivot_wider(names_from=Treatment,values_from=Count) |>
+  select(Outcome,`No drug`,Drug) |>
+  kbl() |>
+  kable_paper("hover", full_width = F) |>
+  pack_rows("Men", 1,2) %>%
+  pack_rows("Women", 3,4) |>
+  pack_rows("Combined data", 5,6)
+```
+:::
+
+::: {.column width="50%"}
+```{r}
+data |>
+  uncount(Count) |>
+  ggplot(aes(x=Treatment,y=Outcome,colour=Gender)) +
+  geom_jitter(width=0.1,height=0.1,size=0.5,shape=21) +
+  geom_smooth(method="lm",formula=y~x,se=F,aes(group=Gender)) +
+  scale_colour_manual(values=sanzo::duos$c070) +
+  theme(legend.position="bottom",
+        title=element_text(size=20),
+        legend.text = element_text(size=20), 
+        axis.text = element_text(size=20)) +
+  labs(x=NULL,y=NULL,title="Regression lines")
+```
+
+```{r}
+c("Men","Women") |>
+  map_df(\(g) {
+    lm(Outcome ~ Treatment, data=data |> 
+         filter(Gender==g) |>
+         uncount(Count) |>
+         mutate(Outcome=Outcome=="Recovered")) |>
+      summary() |>
+      broom::tidy() |>
+      mutate(Gender=g,.before=term)
+  }) |>
+  kbl() |>
+  kable_paper("hover", full_width = F)
+```
+:::
+
+::::
+
+
+# Simpson's paradox (continued)
+The paradox is that in the overall sample recovery rates were lower for patients taking the drug, whereas if we consider the data separately by gender recovery rates increased for both subgroups.
+
+Should a doctor prescribe the drug to a patient or not?
+
+. . .
+
+:::: {.columns}
+
+::: {.column width="50%"}
+It depends, we can't answer this just by looking at the data. We need to add outside knowledge we have about underlying causal pathways.
+
+
+Suppose we know that estrogen has a negative effect on recovery. And women more readily get prescribed the drug.
+
+:::
+
+::: {.column width="50%"}
+
+
+
+```{r disease-treatment-model-1}
+mv_vertices <- tibble(Name=c("Treatment",
+                             "Gender",
+                             "Outcome"),
+                      x=c(0,1,2),
+                      y=c(1,2,1))
+
+mv_edges <- bind_rows(
+  tibble(x=0.3,y=1,xend=1.7,yend=1,colour="brown",curvature=0,comment = "Treatment -> Recovery"),
+  tibble(x=0.8,y=1.9,xend=0.2,yend=1.2,colour="black",curvature=0,comment = "Gender -> Recovery"),
+  tibble(x=1.2,y=1.9,xend=1.8,yend=1.2,colour="black",curvature=0,comment = "Gender -> Treatment"),
+
+  )
+
+model_theme <- list(
+  mountainmathHelpers::theme_mm(),
+    theme(panel.grid = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.text = element_blank()),
+    labs(x=NULL,y=NULL)
+) 
+
+ggplot(mv_vertices) + 
+  geom_label(aes(x=x,y=y,label=Name),size=10) +
+  geom_segment(data=mv_edges,
+               aes(x=x,y=y,xend=xend,yend=yend,colour=colour),
+               size=1,
+               arrow=arrow(length=unit(0.25,"cm"))) +
+  scale_colour_identity() +
+  expand_limits(x=c(-0.2,2.2),y=c(0.7,2.2)) +
+  model_theme +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  theme(title=element_text(size=20)) +
+  labs(title="Disease treatment model",
+       subtitle="")
+```
+:::
+::::
+
+# Simpson's paradox (continued)
+Suppose we have the same data as before, but this time instead of Gender we recorded high and low blood pressure.
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+data |>
+  mutate(Treatment=fct_recode(Treatment,"Drug"="No drug","No drug"="Drug"),
+         `Blood pressure`=fct_recode(Gender,"High"="Women","Low"="Men")) |>
+  select(-Gender) %>%
+  bind_rows(summarize(.,Count=sum(Count),.by=c(Treatment,Outcome)) |>
+              mutate(`Blood pressure`="Combined data")) |>
+  mutate(value=paste0(Count," out of ",sum(Count)," recovered (",scales::percent(Count/sum(Count)),")"),
+         .by=c(`Blood pressure`,Treatment)) |>
+  filter(Outcome=="Recovered") |>
+  select(-Count) |>
+  pivot_wider(names_from=Treatment,values_from=value) |>
+  select(`Blood pressure`,`No drug`,Drug) |>
+  kbl() |>
+  kable_paper("hover", full_width = F) 
+```
+::: 
+::: {.column width="50%"}
+Suppose we know that low blood pressure is a side effect of the drug and low blood pressure negatives effects recovery.
+
+```{r disease-treatment-model-2}
+mv_vertices <- tibble(Name=c("Treatment",
+                             "Blood pressure",
+                             "Outcome"),
+                      x=c(0,1,2),
+                      y=c(1,2,1))
+
+mv_edges <- bind_rows(
+  tibble(x=0.3,y=1,xend=1.7,yend=1,colour="brown",curvature=0,type="solid",
+         comment = "Treatment -> Outcome"),
+  tibble(xend=0.8,yend=1.9,x=0.2,y=1.2,colour="black",curvature=0,type="solid",
+         comment = "Blood pressure -> Treatment"),
+  tibble(x=1.2,y=1.9,xend=1.8,yend=1.2,colour="black",curvature=0,type="dashed",
+         comment = "Blood pressure -> Outcome"),
+
+  )
+
+model_theme <- list(
+  mountainmathHelpers::theme_mm(),
+    theme(panel.grid = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.text = element_blank()),
+    labs(x=NULL,y=NULL)
+) 
+
+ggplot(mv_vertices) + 
+  geom_label(aes(x=x,y=y,label=Name),size=10) +
+  geom_segment(data=mv_edges,
+               aes(x=x,y=y,xend=xend,yend=yend,colour=colour),
+               size=1,
+               arrow=arrow(length=unit(0.25,"cm"))) +
+  scale_colour_identity() +
+  expand_limits(x=c(-0.2,2.2),y=c(0.7,2.2)) +
+  model_theme +
+  #scale_linetype_identity() +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  theme(title=element_text(size=20)) +
+  labs(title="Disease treatment model",
+       subtitle="")
+```
+:::
+::::
+
+If on the other hand we find out that the doctor took patients blood pressure before assigning treatment and prescribed the drug to patients with low blood pressure more often, so blood pressure causes treatment and the error is reversed, then we can conclude that the drug makes things worse.
+
+# Continuous data
+The same phenomenon can occur with continuous data. 
+
+
+:::: {.columns}
+::: {.column width="50%"}
+```{r}
+library(palmerpenguins)
+
+penguins |>
+  filter(!is.na(bill_length_mm),!is.na(bill_depth_mm)) |>
+  ggplot(aes(x=bill_length_mm,y=bill_depth_mm)) +
+  geom_point() +
+  geom_smooth(method="lm",formula = y ~ x, colour="black") +
+    theme(legend.position="bottom",
+        title=element_text(size=20),
+        legend.text = element_text(size=20), 
+        axis.text = element_text(size=20)) +
+  labs(title="Penguin bill length vs depth",
+       x="Bill length  (mm)",y="Bill depth (mm)",
+       colour="Penguin species",
+       caption="Palmer Station Antarctica LTER")
+```
+::: 
+
+::: {.column width="50%"}
+
+```{r}
+penguins |>
+  filter(!is.na(bill_length_mm),!is.na(bill_depth_mm)) |>
+  ggplot(aes(x=bill_length_mm,y=bill_depth_mm,colour=species)) +
+  geom_point() +
+  geom_smooth(method="lm",formula = y ~ x) +
+  geom_smooth(method="lm",formula = y ~ x, colour="black") +
+  scale_colour_manual(values=MetBrewer::met.brewer("Egypt",3)) +
+  theme(legend.position="bottom",
+        title=element_text(size=20),
+        legend.text = element_text(size=20), 
+        axis.text = element_text(size=20)) +
+  labs(title="Penguin bill length vs depth",
+       x="Bill length  (mm)",y="Bill depth (mm)",
+       colour="Penguin species",
+       caption="Palmer Station Antarctica LTER")
+```
+
+::: 
+:::: 
+
+# Continuous data (continued)
+Penguins make it difficult to think about causation, but we can relabel the data to illustrate the point.
+
+:::: {.columns}
+::: {.column width="50%"}
+
+```{r}
+penguins |>
+  filter(!is.na(bill_length_mm),!is.na(bill_depth_mm)) |>
+  mutate(Age=recode(species,
+                     "Adelie"="Senior",
+                     "Chinstrap"="Adult",
+                     "Gentoo"="Child")) |>
+  ggplot(aes(x=bill_length_mm,y=bill_depth_mm,colour=Age)) +
+  geom_point() +
+  geom_smooth(method="lm",formula = y ~ x) +
+  geom_smooth(method="lm",formula = y ~ x, colour="black") +
+  scale_colour_manual(values=MetBrewer::met.brewer("Egypt",3)) +
+  theme(legend.position="bottom",
+        title=element_text(size=20),
+        legend.text = element_text(size=20), 
+        axis.text = element_blank()) +
+  labs(title="Cholesterol vs heart disease",
+       x="Cholsterol",y="Heart attack risk",
+       colour="Age group",
+       caption="Palmer Station Antarctica LTER")
+```
+
+:::
+::: {.column width="50%"}
+
+```{r disease-treatment-model-4}
+mv_vertices <- tibble(Name=c("Cholesterol",
+                             "Age",
+                             "Heart disease"),
+                      x=c(0,1,2),
+                      y=c(1,2,1))
+
+mv_edges <- bind_rows(
+  tibble(x=0.3,y=1,xend=1.7,yend=1,colour="brown",curvature=0,comment = "Treatment -> Recovery"),
+  tibble(x=0.8,y=1.9,xend=0.2,yend=1.2,colour="black",curvature=0,comment = "Gender -> Recovery"),
+  tibble(x=1.2,y=1.9,xend=1.8,yend=1.2,colour="black",curvature=0,comment = "Gender -> Treatment"),
+
+  )
+
+model_theme <- list(
+  mountainmathHelpers::theme_mm(),
+    theme(panel.grid = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.text = element_blank()),
+    labs(x=NULL,y=NULL)
+) 
+
+ggplot(mv_vertices) + 
+  geom_label(aes(x=x,y=y,label=Name),size=10) +
+  geom_segment(data=mv_edges,
+               aes(x=x,y=y,xend=xend,yend=yend,colour=colour),
+               size=1,
+               arrow=arrow(length=unit(0.25,"cm"))) +
+  scale_colour_identity() +
+  expand_limits(x=c(-0.2,2.2),y=c(0.7,2.2)) +
+  model_theme +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  theme(title=element_text(size=20)) +
+  labs(title="Cholesterol and heart disease model",
+       subtitle="")
+```
+
+:::
+::::
+
+# "Correlation is not causation"
+Correlation (and regression) are statistical concept that quantify relationships between variables, they just rely on the data we are given. To make statements about causality we need to additionally make assumptions about underlying causal pathways.
+
+# Randomized controlled trials
+
+Random controlled trials break the causal pathways between unmeasured confounders and treatment by randomly assigning treatment to patients. 
+
+:::: {.columns}
+
+::: {.column width="50%"}
+
+```{r disease-treatment-model-3}
+mv_vertices <- tibble(Name=c("Treatment",
+                             "Unmeasured confounders",
+                             "Outcome"),
+                      x=c(0,1,2),
+                      y=c(1,2,1))
+
+mv_edges <- bind_rows(
+  tibble(x=0.3,y=1,xend=1.7,yend=1,colour="brown",curvature=0,type="solid",
+         comment = "Treatment -> Outcome"),
+  tibble(x=0.8,y=1.9,xend=0.2,yend=1.2,colour="black",curvature=0,type="dashed",
+         comment = "Blood pressure -> Treatment"),
+  tibble(x=1.2,y=1.9,xend=1.8,yend=1.2,colour="black",curvature=0,type="solid",
+         comment = "Blood pressure -> Outcome"),
+
+  )
+
+model_theme <- list(
+  mountainmathHelpers::theme_mm(),
+    theme(panel.grid = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.text = element_blank()),
+    labs(x=NULL,y=NULL)
+) 
+
+ggplot(mv_vertices) + 
+  geom_label(aes(x=x,y=y,label=Name),size=10) +
+  geom_segment(data=mv_edges,
+               aes(x=x,y=y,xend=xend,yend=yend,colour=colour,linetype=type),
+               size=1,
+               arrow=arrow(length=unit(0.5,"cm"))) +
+  scale_colour_identity() +
+  expand_limits(x=c(-0.2,2.2),y=c(0.7,2.2)) +
+  model_theme +
+  scale_linetype_identity() +
+  geom_text(data=NULL,
+            x=0.45,y=1.5,
+            label="X",
+            size=20,colour="firebrick") +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  theme(title=element_text(size=20)) +
+  labs(title="Randomized controlled trial",
+       subtitle="")
+```
+::: 
+::: {.column width="50%"}
+Problems with randomized controlled trials:
+
+* can't always do them
+* heterogeneous treatment effects produce biased estimates of average treatment effects
+* generalizability
+* transportability
+
+
+::: 
+:::: 
+
+# Causality in observational studies
+
+
+* Always think about the underlying causal pathways, the *data generation process*, when interpreting data.
+* Draw a causal graph of what you assume the causal pathways to be and be prepared to defend it.
+* Always be mindful of what variables to include in a model and why they should or should not be included.
+
+. . .
+
+In regression equations we sometimes include "control" variables. The inclusion of each one needs to be carefully justified, there are
+
+* "good controls" that remove bias and 
+* "bad controls" that introduce bias
+
+(... and neutral controls, and the status of controls changes depending what other "controls" are included)
+
+# Example of a *bad control*: Collider bias
+
+:::: {.columns}
+
+::: {.column width="50%"}
+```{r}
+set.seed(73)
+df <- tibble(x=rnorm(500),y=rnorm(500)) |>
+  mutate(include=x+y>0.7)
+
+df |>
+ggplot(aes(x=x,y=y)) +
+  geom_point(data=~filter(.,include)) +
+  geom_point(data=~filter(.,!include),size=NA) +
+  geom_smooth(data=~filter(.,include),method="lm",formula=y~x) +
+  coord_fixed() +
+  theme(legend.position="bottom",
+        axis.text = element_blank(),
+        title=element_text(size=20),
+        legend.text = element_text(size=20)) +
+  labs(x="Height",y="Skill",
+       title="NBA basketball players")
+```
+
+:::
+::: {.column width="50%"}
+
+Studying the relationship between height and skill among NBA players seems to indicate that height might cause players to have lower skill.
+
+But selecting on NBA players acts as a *collider* and induces a spurious relationship between height and skill.
+
+:::
+::::
+
+. . .
+
+:::: {.columns}
+::: {.column width="50%"}
+
+```{r}
+df |>
+ggplot(aes(x=x,y=y,colour=include)) +
+  geom_point() +
+  geom_smooth(method="lm",formula=y~x) +
+  geom_smooth(method="lm",formula=y~x,group=1,colour="black") +
+  coord_fixed() +
+  scale_colour_brewer(palette="Dark2") +
+  theme(legend.position="none",
+        axis.text = element_blank(),
+        title=element_text(size=20),
+        legend.text = element_text(size=20)) +
+  labs(x="Height",y="Skill",
+       title="NBA players and everyone else")
+```
+
+:::
+::: {.column width="50%"}
+
+```{r basketball-model}
+mv_vertices <- tibble(Name=c("Height",
+                             "NBA",
+                             "Skill"),
+                      x=c(0,1,2),
+                      y=c(1,2,1))
+
+mv_edges <- bind_rows(
+  tibble(x=0.3,y=1,xend=1.7,yend=1,colour="brown",curvature=0,type="solid",
+         comment = "Treatment -> Outcome"),
+  tibble(xend=0.8,yend=1.9,x=0.2,y=1.2,colour="black",curvature=0,type="solid",
+         comment = "Blood pressure -> Treatment"),
+  tibble(xend=1.2,yend=1.9,x=1.8,y=1.2,colour="black",curvature=0,type="dashed",
+         comment = "Blood pressure -> Outcome"),
+
+  )
+
+model_theme <- list(
+  mountainmathHelpers::theme_mm(),
+    theme(panel.grid = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.text = element_blank()),
+    labs(x=NULL,y=NULL)
+) 
+
+ggplot(mv_vertices) + 
+  geom_label(aes(x=x,y=y,label=Name),size=10) +
+  geom_segment(data=mv_edges,
+               aes(x=x,y=y,xend=xend,yend=yend,colour=colour),
+               size=1,
+               arrow=arrow(length=unit(0.25,"cm"))) +
+  scale_colour_identity() +
+  expand_limits(x=c(-0.2,2.2),y=c(0.7,2.2)) +
+  model_theme +
+  #scale_linetype_identity() +
+  theme(plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5)) +
+  theme(title=element_text(size=20)) +
+  labs(title="Basketball model",
+       subtitle="")
+```
+
+:::
+::::
+
+# Further reading
+
+* [Causal Inference in Statistics: A Primer](https://www.datascienceassn.org/sites/default/files/CAUSAL%20INFERENCE%20IN%20STATISTICS.pdf), Judea Pearl, Madelyn Glymour, Nicholas P. Jewell, 2016
+* [The book of Why](https://www.amazon.ca/Book-Why-Science-Cause-Effect/dp/B07CYCFWR7/ref=sr_1_1?hvadid=321844882793&hvdev=c&hvlocphy=9001561&hvnetw=g&hvqmt=b&hvrand=18271384037399984703&hvtargid=kwd-818874273786&hydadcr=22486_9261677&keywords=the+book+of+why+by+judea+pearl&qid=1700471749&sr=8-1), Judea Pearl, Dana Mackenzie, 2018 (Popular science book)
+* [A Crash Course in Good and Bad Controls](https://ftp.cs.ucla.edu/pub/stat_ser/r493-reprint.pdf), Carlos Cinelli, Andrew Forney, Judea Pearl, 2022
+
+
