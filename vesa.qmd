@@ -20,6 +20,7 @@ library(cansim)
 
 # Topic for today: {auto-animate=true}
 
+# Topic for today: {auto-animate=true}
 * An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation
 
 # Topic for today: {auto-animate=true}
@@ -36,13 +37,13 @@ library(cansim)
 * ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
 * ~~Targets: How to construct housing targets and what these are for Vancouver~~
 * ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
-* Housing outcomes: Households are mallable and we need to think beyound just affordability/shelter-cost-to-income ratios.
+* Housing outcomes: Households are malleable and we need to think beyond just affordability/shelter-cost-to-income ratios.
 
 # Topic for today: {auto-animate=true}
 * ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
 * ~~Targets: How to construct housing targets and what these are for Vancouver~~
 * ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
-* ~~Housing outcomes: Households are mallable and we need to think beyound just affordability/shelter-cost-to-income ratios.~~
+* ~~Housing outcomes: Households are malleable and we need to think beyond just affordability/shelter-cost-to-income ratios.~~
 * **A fun look at population and children in Vancouver over space and time.**
 
 # Population over time
@@ -86,7 +87,7 @@ We can check what regions, on net, people of specific age groups move away from 
 ::::
 
 # Children in Vancouver
-Children are in indicator specides. If policies work for children, they probably work for almost everyone. 
+Children are in indicator species. If policies work for children, they probably work for almost everyone. 
 
 ![](https://doodles.mountainmath.ca/blog/2022/05/11/children-are-good-actually/index_files/figure-html/children_change-1.png)
 
