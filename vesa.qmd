@@ -37,13 +37,13 @@ library(cansim)
 * ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
 * ~~Targets: How to construct housing targets and what these are for Vancouver~~
 * ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
-* Housing outcomes: Households are malleable and we need to think beyond just affordability/shelter-cost-to-income ratios.
+* Housing outcomes: Households are malleable and we need to think beyond just affordability/Core Housing Need.
 
 # Topic for today: {auto-animate=true}
 * ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
 * ~~Targets: How to construct housing targets and what these are for Vancouver~~
 * ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
-* ~~Housing outcomes: Households are malleable and we need to think beyond just affordability/shelter-cost-to-income ratios.~~
+* ~~Housing outcomes: Households are malleable and we need to think beyond just affordability/Core Housing Need.~~
 * **A fun look at population and children in Vancouver over space and time.**
 
 # Population over time
@@ -100,7 +100,7 @@ Children are in indicator species. If policies work for children, they probably 
 
 ![](https://doodles.mountainmath.ca/blog/2022/05/11/children-are-good-actually/index_files/figure-html/unnamed-chunk-8-1.png)
 
-# What matters for childrem: Bedrooms
+# What matters for children: Bedrooms
 
 ![](https://doodles.mountainmath.ca/posts/2019-04-20-a-bedroom-is-a-bedroom_files/figure-html/bedrooms-1.png)
 
