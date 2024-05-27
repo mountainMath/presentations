@@ -1,0 +1,240 @@
+---
+title: "Data and the City"
+subtitle: "GEOG350"
+author: "Jens von Bergmann"
+date: "May 29, 2024"
+format: revealjs
+css: shift_heading_up.css
+editor: visual
+fontsize: 20pt
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(cansim)
+```
+
+# Topic for today
+
+-   So much data!
+
+-   Patterns in population growth
+
+-   Income: choosing metrics
+
+-   Children in Vancouver - making sense of patterns of change
+
+-   The data generation process - the central question for any data analysis
+
+
+# So much data!
+My standard toolbox:
+
+:::: columns
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png){width="50%"}
+
+1996-2021 Census data
+:::
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/cansim/master/images/cansim-sticker.png){width="50%"}
+
+Statistics Canada data tables
+:::
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png){width="50%"}
+
+Making data on different geographies comparable
+:::
+::: {.column width="33%"}
+
+![](https://mountainmath.github.io/cmhc/reference/figures/logo.png){width="50%"}
+
+CMHC data
+:::
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/VancouvR/master/images/VancouvR-sticker.png){width="50%"}
+
+City of Vanocuver Open Data
+:::
+::: {.column width="33%"}
+![](https://mountainmath.github.io/canbank/logo.svg){width="50%"}
+
+Bank of Canada data
+:::
+::::
+
+# Population over time
+
+```{=html}
+<a href="https://doodles.mountainmath.ca/html/yvr_pop_timeline_2021.html" target="_blank"><img src="https://doodles.mountainmath.ca/posts/2024-04-23-population-timelines-update/index_files/figure-html/vancouver_pop_change_1971_2021-1.png"></a>
+```
+Vancouver has grown since the 70s, but it hasn't grown uniformly. Where has population grown, when, and by how much?
+
+# Population by age
+
+```{r}
+age_pyramid_styling <- list(
+  scale_x_discrete(breaks=c(seq(0, 100, 5),"100+")),
+  scale_y_continuous(labels = scales::comma),
+  coord_flip(),
+  scale_fill_brewer(palette = "Set1"),
+  theme_bw(),
+  labs(caption="StatCan 2021 census"))
+```
+
+```{r fig.height=4}
+cancensusHelpers::get_age_data('2021',list(CSD=c("5915022","5915025","5915004","5915055"))) %>% 
+  ggplot(aes(x = Age, y = Population, fill = Gender)) + geom_bar(stat="identity") +
+  facet_wrap("`Region Name`",nrow=1, scales="free_x") + age_pyramid_styling
+```
+
+Very different shapes of age pyramids in different cities in the region. How does this happen?
+
+# Net migration
+
+::: columns
+::: {.column width="50%"}
+People move. A lot. Almost 50% of the population in the City of Vancouver in 2021 lived at a different address in 2016.
+
+We can check what regions, on net, people of specific age groups move away from and what regions they tend to move to.
+:::
+
+::: {.column width="50%"}
+<a href="https://censusmapper.ca/maps/731" target="_blank"><img src="https://doodles.mountainmath.ca/posts/2017-05-16-lifeblood/images/net_van.png"/></a>
+:::
+:::
+
+
+# Income segregation
+Your measure determines what you see.
+
+:::: columns
+::: {.column width="50%"}
+
+![](images/cov_income_classification.png)
+:::
+::: {.column width="50%"}
+
+Average 2015 individual income relative to Metro average by 2016 place of residence, split into 
+
+*   Very High (>1.4 times Metro average), 
+*   High (1.2-1.4), 
+*   Medium (0.8-1.2), 
+*   Low (0.6-0.8), 
+*   Very Low (<0.6).
+
+(Source: [Neighbourhood change project](http://neighbourhoodchange.ca/documents/2017/12/vancouver-city-income-maps-1990-and-2015.pdf))
+:::
+::::
+
+# Income mixing and segregation
+
+:::: columns
+::: {.column width="75%"}
+
+![](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time/index_files/figure-html/unnamed-chunk-15-1.png)
+
+:::
+::: {.column width="25%"}
+Brackets:
+
+*   Low <br> (0 to 30th percentile)
+*   Medium <br> (30th to 70th percentile)
+*   High <br> (70th to 100th percentile).
+
+:::
+::::
+
+Share of population in 2015 adjusted after-tax family income by 2016 geography of residence relative to Metro distribution.
+
+
+# Income mixing and segregation
+Other [useful ways to characterize income mixing and segregation](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation/index.html).
+
+:::: columns
+::: {.column width="50%"}
+![](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation/index_files/figure-html/vancouver_d_index-1.png)
+
+:::
+::: {.column width="50%"}
+![](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation/index_files/figure-html/unnamed-chunk-6-1.png)
+
+:::
+::: {.column width="50%"}
+![](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation/index_files/figure-html/unnamed-chunk-13-1.png)
+
+:::
+::: {.column width="50%"}
+![](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation/index_files/figure-html/unnamed-chunk-20-1.png)
+
+:::
+::::
+
+# Children in Vancouver
+
+Children are in indicator species. If policies work for children, they probably work for almost everyone.
+
+![](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually/index_files/figure-html/children_change-1.png)
+
+# Children in Vancouver: Change over 5-year periods
+
+![](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually/index_files/figure-html/unnamed-chunk-2-1.png)
+
+# Children in Vancouver: A closer look
+
+![](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually/index_files/figure-html/unnamed-chunk-8-1.png)
+
+# What could be driving this?
+
+![](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually/index_files/figure-html/unnamed-chunk-10-1.png)
+
+# What matters for children: Bedrooms
+
+![](https://doodles.mountainmath.ca/posts/2019-04-20-a-bedroom-is-a-bedroom/index_files/figure-html/bedrooms-1.png)
+
+
+# The data generation process
+
+:::: columns
+::: {.column width="50%"}
+
+![](https://github.com/mountainMath/xkcd_exponential/raw/main/rental_xkcd_files/figure-gfm/unnamed-chunk-1-1.png)
+
+:::
+::: {.column width="50%"}
+We have lots of data easily available to us. But too often do we jump to conclusions based on preconceived notions.
+
+We need to pay more attention to the data generation process. What social and economic processes do we think underlay a given data series? Can we test if these theories are consistent with the data? Can we establish causal mechanisms?
+
+:::
+::::
+
+# Making progress
+
+With so much data, and so much existing research, how do we move forward? My answer to this is to emphasize the following related features when analyzing data:
+
+-   **Reproducibility**
+
+-   **Transparency**
+
+-   **Adaptability**
+
+This means to clearly describe methods and assumptions, use publicly available data sources whenever possible, and most importantly **share your code**!
+
+Sharing your code makes it unequivocally clear what you did, it keeps you honest, and it allows others to build on your work. Different people have different perspectives, make different assumptions and different choices in their analysis. Sharing your code makes it easy for others to build on your work and improve it.
+
+# 
+
+Thanks for bearing with me. These slides are online at <https://mountainmath.ca/GEOG350/>. The images and data are taken from various blog posts, including:
+
+-   [Population timelines update](https://doodles.mountainmath.ca/posts/2024-04-23-population-timelines-update/)
+-   [Net migration (on CensusMapper)](https://censusmapper.ca/maps/731)
+-   [Children are good, actually](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually)
+-   [A bedroom is a bedroom](https://doodles.mountainmath.ca/posts/2019-04-20-a-bedroom-is-a-bedroom/)
+-   [Understanding income distributions across geographies and time](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time/)
+-   [Income mixing and segregation](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation/)

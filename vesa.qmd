@@ -18,43 +18,47 @@ library(tidyverse)
 library(cansim)
 ```
 
-# Topic for today: {auto-animate=true}
+# Topic for today: {auto-animate="true"}
 
-# Topic for today: {auto-animate=true}
-* An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation
+# Topic for today: {auto-animate="true"}
 
-# Topic for today: {auto-animate=true}
-* ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
-* Targets: How to construct housing targets and what these are for Vancouver
+-   An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation
 
-# Topic for today: {auto-animate=true}
-* ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
-* ~~Targets: How to construct housing targets and what these are for Vancouver~~
-* What would rents be like if every apartment building built in the past five years had been 20% taller?
+# Topic for today: {auto-animate="true"}
 
+-   ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
+-   Targets: How to construct housing targets and what these are for Vancouver
 
-# Topic for today: {auto-animate=true}
-* ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
-* ~~Targets: How to construct housing targets and what these are for Vancouver~~
-* ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
-* Housing outcomes: Households are malleable and we need to think beyond just affordability/Core Housing Need.
+# Topic for today: {auto-animate="true"}
 
-# Topic for today: {auto-animate=true}
-* ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
-* ~~Targets: How to construct housing targets and what these are for Vancouver~~
-* ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
-* ~~Housing outcomes: Households are malleable and we need to think beyond just affordability/Core Housing Need.~~
-* **A fun look at population and children in Vancouver over space and time.**
+-   ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
+-   ~~Targets: How to construct housing targets and what these are for Vancouver~~
+-   What would rents be like if every apartment building built in the past five years had been 20% taller?
+
+# Topic for today: {auto-animate="true"}
+
+-   ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
+-   ~~Targets: How to construct housing targets and what these are for Vancouver~~
+-   ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
+-   Housing outcomes: Households are malleable and we need to think beyond just affordability/Core Housing Need.
+
+# Topic for today: {auto-animate="true"}
+
+-   ~~An overview over the modelling work of the impacts of the provincial SSMUH and TOA legislation~~
+-   ~~Targets: How to construct housing targets and what these are for Vancouver~~
+-   ~~What would rents be like if every apartment building built in the past five years had been 20% taller?~~
+-   ~~Housing outcomes: Households are malleable and we need to think beyond just affordability/Core Housing Need.~~
+-   **A fun look at population and children in Vancouver over space and time.**
 
 # Population over time
 
 ```{=html}
 <a href="https://doodles.mountainmath.ca/html/yvr_pop_timeline" target="_blank"><img src="https://doodles.mountainmath.ca/images/van_pop_change_3d.png"></a>
 ```
-
 Vancouver has grown since the 70s, but it hasn't grown uniformly. Where has population grown, when, and by how much?
 
 # Population by age
+
 ```{r}
 age_pyramid_styling <- list(
   scale_x_discrete(breaks=c(seq(0, 100, 5),"100+")),
@@ -71,30 +75,31 @@ cancensusHelpers::get_age_data('2021',list(CSD=c("5915022","5915025","5915004","
   facet_wrap("`Region Name`",nrow=1, scales="free_x") + age_pyramid_styling
 ```
 
-Very different shapes of age pyramids in different cities in the region. How does this happen? 
+Very different shapes of age pyramids in different cities in the region. How does this happen?
 
-# Net migration 
-:::: {.columns}
+# Net migration
+
+::: columns
 ::: {.column width="50%"}
-People move. A lot. Almost 50% of the population in the City of Vancouver in 2021 lived at a different address in 2016. 
+People move. A lot. Almost 50% of the population in the City of Vancouver in 2021 lived at a different address in 2016.
 
 We can check what regions, on net, people of specific age groups move away from and what regions they tend to move to.
 :::
 
 ::: {.column width="50%"}
-<a href="https://censusmapper.ca/maps/731" target="_blank"><img src="https://doodles.mountainmath.ca/images/net_van.png"></a>
+<a href="https://censusmapper.ca/maps/731" target="_blank"><img src="https://doodles.mountainmath.ca/images/net_van.png"/></a>
 :::
-::::
+:::
 
 # Children in Vancouver
-Children are in indicator species. If policies work for children, they probably work for almost everyone. 
+
+Children are in indicator species. If policies work for children, they probably work for almost everyone.
 
 ![](https://doodles.mountainmath.ca/blog/2022/05/11/children-are-good-actually/index_files/figure-html/children_change-1.png)
 
 # Children in Vancouver: Change over 5-year periods
 
 ![](https://doodles.mountainmath.ca/blog/2022/05/11/children-are-good-actually/index_files/figure-html/unnamed-chunk-2-1.png)
-
 
 # Children in Vancouver: A closer look
 
@@ -106,12 +111,9 @@ Children are in indicator species. If policies work for children, they probably 
 
 # 
 
-Thanks for bearing with me. These slides are online at [https://mountainmath.ca/vesa/](https://mountainmath.ca/vesa/). The images and data are taken from various blog posts:
+Thanks for bearing with me. These slides are online at <https://mountainmath.ca/vesa/>. The images and data are taken from various blog posts:
 
-
-* [Census custom timeelines](https://doodles.mountainmath.ca/blog/2019/06/15/census-custom-timelines/)
-* [Net migration (on CensusMapper)](https://censusmapper.ca/maps/731)
-* [Children are good, actually](https://doodles.mountainmath.ca/blog/2022/05/11/children-are-good-actually/)
-* [A bedroom is a bedroom](https://doodles.mountainmath.ca/blog/2019/04/20/a-bedroom-is-a-bedroom/)
-
-
+-   [Census custom timeelines](https://doodles.mountainmath.ca/blog/2019/06/15/census-custom-timelines/)
+-   [Net migration (on CensusMapper)](https://censusmapper.ca/maps/731)
+-   [Children are good, actually](https://doodles.mountainmath.ca/blog/2022/05/11/children-are-good-actually/)
+-   [A bedroom is a bedroom](https://doodles.mountainmath.ca/blog/2019/04/20/a-bedroom-is-a-bedroom/)
