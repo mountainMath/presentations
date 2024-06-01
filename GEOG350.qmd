@@ -214,19 +214,17 @@ We need to pay more attention to the data generation process. What social and ec
 :::
 ::::
 
-# Making progress
+# An (opinionated) perspective how to move forward
 
-With so much data, and so much existing research, how do we move forward? My answer to this is to emphasize the following related features when analyzing data:
+With so much data, and so much existing research, how do we move forward? Cities are complex systems, and identifying underlying demographic, social, and economic processes is hard. 
 
--   **Reproducibility**
-
--   **Transparency**
-
--   **Adaptability**
+I put a strong emphasis on **reproducible** and **adaptable** work flows to ensure the analysis is **transparent**, can easily be updated as new data becomes available, and can be tweaked or adapted to address related questions.
 
 This means to clearly describe methods and assumptions, use publicly available data sources whenever possible, and most importantly **share your code**!
 
-Sharing your code makes it unequivocally clear what you did, it keeps you honest, and it allows others to build on your work. Different people have different perspectives, make different assumptions and different choices in their analysis. Sharing your code makes it easy for others to build on your work and improve it.
+Sharing your code makes it unequivocally clear what you did, it keeps you honest, and it allows others to build on your work. We need more and deeper data analysis and a wider range of people engaging in data analysis from a broad range of perspectives.
+
+Different people bring in  different perspectives, make different assumptions and different choices in their analysis. Sharing your code makes it easy for others to build on your work, adapt it, and maybe even improve on it.
 
 # 
 
