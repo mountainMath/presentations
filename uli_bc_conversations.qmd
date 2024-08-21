@@ -1,0 +1,131 @@
+---
+title: "Urban Analytics and Data Visualization"
+subtitle: "ULI BC: Coffee & Conversations"
+author: "Jens von Bergmann"
+date: "Aug 22, 2024"
+format: revealjs
+css: shift_heading_up.css
+editor: visual
+fontsize: 20pt
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(cansim)
+```
+
+# CensusMapper
+
+::: columns
+::: {.column width="50%"}
+My start down the road of urban analytics was CensusMapper.
+
+CensusMapper is a flexible mapping tool to map census data Canada wide at various geographic detail mapping any combination of census variables.
+:::
+
+::: {.column width="50%"}
+<a href="https://censusmapper.ca/maps/731" target="_blank"><img src="https://doodles.mountainmath.ca/posts/2017-05-16-lifeblood/images/net_van.png"/></a>
+:::
+:::
+
+## Suite of tools for Canadian data analysis
+
+::: columns
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png){width="50%"}
+
+1996-2021 Census data
+:::
+
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/cansim/master/images/cansim-sticker.png){width="50%"}
+
+Statistics Canada data tables
+:::
+
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png){width="50%"}
+
+Making data on different geographies comparable
+:::
+
+::: {.column width="33%"}
+![](https://mountainmath.github.io/cmhc/reference/figures/logo.png){width="50%"}
+
+CMHC data
+:::
+
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/VancouvR/master/images/VancouvR-sticker.png){width="50%"}
+
+City of Vanocuver Open Data
+:::
+
+::: {.column width="33%"}
+![](https://mountainmath.github.io/canbank/logo.svg){width="50%"}
+
+Bank of Canada data
+:::
+:::
+
+# Population over time
+
+```{=html}
+<a href="https://doodles.mountainmath.ca/html/yvr_pop_timeline_2021.html" target="_blank"><img src="images/cov_pop_change_3d.png"></a>
+```
+Vancouver has grown since the 70s, but it hasn't grown uniformly. Where has population grown, when, and by how much?
+
+# Income mixing and segregation
+
+::: columns
+::: {.column width="75%"}
+![](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time/index_files/figure-html/unnamed-chunk-15-1.png)
+:::
+
+::: {.column width="25%"}
+Brackets:
+
+-   Low <br> (0 to 30th percentile)
+-   Medium <br> (30th to 70th percentile)
+-   High <br> (70th to 100th percentile).
+:::
+:::
+
+Share of population in 2015 adjusted after-tax family income by 2016 geography of residence relative to Metro distribution.
+
+# Children in Vancouver
+
+Children are in indicator species. If policies work for children, they probably work for almost everyone.
+
+![](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually/index_files/figure-html/children_change-1.png)
+
+
+# The data generation process
+
+::: columns
+::: {.column width="50%"}
+![](https://github.com/mountainMath/xkcd_exponential/raw/main/rental_xkcd_files/figure-gfm/unnamed-chunk-1-1.png)
+:::
+
+::: {.column width="50%"}
+We have lots of data easily available to us. But too often do we jump to conclusions based on preconceived notions.
+
+We need to pay more attention to the data generation process. What social and economic processes do we think underlay a given data series? Can we test if these theories are consistent with the data? Can we establish causal mechanisms?
+:::
+:::
+
+
+# Thank you!
+
+Thanks for bearing with me. These slides are online at <https://mountainmath.ca/uli_bc_conversations/>. The images and data are taken from various blog posts, including:
+
+-   [Population timelines update](https://doodles.mountainmath.ca/posts/2024-04-23-population-timelines-update/)
+-   [Net migration (on CensusMapper)](https://censusmapper.ca/maps/731)
+-   [Children are good, actually](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually)
+-   [Understanding income distributions across geographies and time](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time/)
+-   [Income mixing and segregation](https://doodles.mountainmath.ca/posts/2020-09-21-income-mixing-and-segregation/)

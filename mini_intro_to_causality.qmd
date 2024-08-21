@@ -29,12 +29,9 @@ I will give a very brief and incomplete overview over how to get to causality.
 
 # Simpson's paradox
 
-:::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
-
-
-Suppose we get results of a drug trial that looks like this: 
+Suppose we get results of a drug trial that looks like this:
 
 ```{r}
 data <- tribble(~Gender,~Treatment,~Outcome,~Count,
@@ -63,11 +60,9 @@ data |>
 ```
 
 (Example taken from J. Pearl et al, Causal Inference in Statistics: A Primer)
-
 :::
 
 ::: {.column width="50%"}
-
 ```{r}
 pd <- data |>
   summarize(Count = sum(Count), .by=c(Treatment,Outcome)) |>
@@ -86,19 +81,14 @@ lm(Outcome ~ Treatment, data=pd |> mutate(Outcome=Outcome=="Recovered")) |>
   kbl() |>
   kable_paper("hover", full_width = F)
 ```
-
+:::
 :::
 
-::::
-
 # Simpson's paradox (continued)
+
 Suppose we also recorded the gender of the patients and results split by gender like this:
 
-
-
-
-:::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
 ```{r}
 data %>%
@@ -149,31 +139,24 @@ c("Men","Women") |>
   kable_paper("hover", full_width = F)
 ```
 :::
-
-::::
-
+:::
 
 # Simpson's paradox (continued)
+
 The paradox is that in the overall sample recovery rates were lower for patients taking the drug, whereas if we consider the data separately by gender recovery rates increased for both subgroups.
 
 Should a doctor prescribe the drug to a patient or not?
 
 . . .
 
-:::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
 It depends, we can't answer this just by looking at the data. We need to add outside knowledge we have about underlying causal pathways.
 
-
 Suppose we know that estrogen has a negative effect on recovery. And women more readily get prescribed the drug.
-
 :::
 
 ::: {.column width="50%"}
-
-
-
 ```{r disease-treatment-model-1}
 mv_vertices <- tibble(Name=c("Treatment",
                              "Gender",
@@ -212,13 +195,13 @@ ggplot(mv_vertices) +
        subtitle="")
 ```
 :::
-::::
+:::
 
 # Simpson's paradox (continued)
+
 Suppose we have the same data as before, but this time instead of Gender we recorded high and low blood pressure.
 
-:::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
 ```{r}
 data |>
@@ -236,7 +219,8 @@ data |>
   kbl() |>
   kable_paper("hover", full_width = F) 
 ```
-::: 
+:::
+
 ::: {.column width="50%"}
 Suppose we know that low blood pressure is a side effect of the drug and low blood pressure negatives effects recovery.
 
@@ -282,15 +266,15 @@ ggplot(mv_vertices) +
        subtitle="")
 ```
 :::
-::::
+:::
 
 If on the other hand we find out that the doctor took patients blood pressure before assigning treatment and prescribed the drug to patients with low blood pressure more often, so blood pressure causes treatment and the error is reversed, then we can conclude that the drug makes things worse.
 
 # Continuous data
-The same phenomenon can occur with continuous data. 
 
+The same phenomenon can occur with continuous data.
 
-:::: {.columns}
+::: columns
 ::: {.column width="50%"}
 ```{r}
 library(palmerpenguins)
@@ -309,10 +293,9 @@ penguins |>
        colour="Penguin species",
        caption="Palmer Station Antarctica LTER")
 ```
-::: 
+:::
 
 ::: {.column width="50%"}
-
 ```{r}
 penguins |>
   filter(!is.na(bill_length_mm),!is.na(bill_depth_mm)) |>
@@ -330,16 +313,15 @@ penguins |>
        colour="Penguin species",
        caption="Palmer Station Antarctica LTER")
 ```
-
-::: 
-:::: 
+:::
+:::
 
 # Continuous data (continued)
+
 Penguins make it difficult to think about causation, but we can relabel the data to illustrate the point.
 
-:::: {.columns}
+::: columns
 ::: {.column width="50%"}
-
 ```{r}
 penguins |>
   filter(!is.na(bill_length_mm),!is.na(bill_depth_mm)) |>
@@ -361,10 +343,9 @@ penguins |>
        colour="Age group",
        caption="Palmer Station Antarctica LTER")
 ```
-
 :::
-::: {.column width="50%"}
 
+::: {.column width="50%"}
 ```{r disease-treatment-model-4}
 mv_vertices <- tibble(Name=c("Cholesterol",
                              "Age",
@@ -402,21 +383,19 @@ ggplot(mv_vertices) +
   labs(title="Cholesterol and heart disease model",
        subtitle="")
 ```
-
 :::
-::::
+:::
 
 # "Correlation is not causation"
+
 Correlation (and regression) are statistical concept that quantify relationships between variables, they just rely on the data we are given. To make statements about causality we need to additionally make assumptions about underlying causal pathways.
 
 # Randomized controlled trials
 
-Random controlled trials break the causal pathways between unmeasured confounders and treatment by randomly assigning treatment to patients. 
+Random controlled trials break the causal pathways between unmeasured confounders and treatment by randomly assigning treatment to patients.
 
-:::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
-
 ```{r disease-treatment-model-3}
 mv_vertices <- tibble(Name=c("Treatment",
                              "Unmeasured confounders",
@@ -462,39 +441,36 @@ ggplot(mv_vertices) +
   labs(title="Randomized controlled trial",
        subtitle="")
 ```
-::: 
+:::
+
 ::: {.column width="50%"}
 Problems with randomized controlled trials:
 
-* can't always do them
-* heterogeneous treatment effects produce biased estimates of average treatment effects
-* generalizability
-* transportability
-
-
-::: 
-:::: 
+-   can't always do them
+-   heterogeneous treatment effects produce biased estimates of average treatment effects
+-   generalizability
+-   transportability
+:::
+:::
 
 # Causality in observational studies
 
-
-* Always think about the underlying causal pathways, the *data generation process*, when interpreting data.
-* Draw a causal graph of what you assume the causal pathways to be and be prepared to defend it.
-* Always be mindful of what variables to include in a model and why they should or should not be included.
+-   Always think about the underlying causal pathways, the *data generation process*, when interpreting data.
+-   Draw a causal graph of what you assume the causal pathways to be and be prepared to defend it.
+-   Always be mindful of what variables to include in a model and why they should or should not be included.
 
 . . .
 
 In regression equations we sometimes include "control" variables. The inclusion of each one needs to be carefully justified, there are
 
-* "good controls" that remove bias and 
-* "bad controls" that introduce bias
+-   "good controls" that remove bias and
+-   "bad controls" that introduce bias
 
 (... and neutral controls, and the status of controls changes depending what other "controls" are included)
 
 # Example of a *bad control*: Collider bias
 
-:::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
 ```{r}
 set.seed(73)
@@ -514,22 +490,19 @@ ggplot(aes(x=x,y=y)) +
   labs(x="Height",y="Skill",
        title="NBA basketball players")
 ```
-
 :::
-::: {.column width="50%"}
 
+::: {.column width="50%"}
 Studying the relationship between height and skill among NBA players seems to indicate that height might cause players to have lower skill.
 
 But selecting on NBA players acts as a *collider* and induces a spurious relationship between height and skill.
-
 :::
-::::
+:::
 
 . . .
 
-:::: {.columns}
+::: columns
 ::: {.column width="50%"}
-
 ```{r}
 df |>
 ggplot(aes(x=x,y=y,colour=include)) +
@@ -545,10 +518,9 @@ ggplot(aes(x=x,y=y,colour=include)) +
   labs(x="Height",y="Skill",
        title="NBA players and everyone else")
 ```
-
 :::
-::: {.column width="50%"}
 
+::: {.column width="50%"}
 ```{r basketball-model}
 mv_vertices <- tibble(Name=c("Height",
                              "NBA",
@@ -590,14 +562,11 @@ ggplot(mv_vertices) +
   labs(title="Basketball model",
        subtitle="")
 ```
-
 :::
-::::
+:::
 
 # Further reading
 
-* [Causal Inference in Statistics: A Primer](https://www.datascienceassn.org/sites/default/files/CAUSAL%20INFERENCE%20IN%20STATISTICS.pdf), Judea Pearl, Madelyn Glymour, Nicholas P. Jewell, 2016
-* [The book of Why](https://www.amazon.ca/Book-Why-Science-Cause-Effect/dp/B07CYCFWR7/ref=sr_1_1?hvadid=321844882793&hvdev=c&hvlocphy=9001561&hvnetw=g&hvqmt=b&hvrand=18271384037399984703&hvtargid=kwd-818874273786&hydadcr=22486_9261677&keywords=the+book+of+why+by+judea+pearl&qid=1700471749&sr=8-1), Judea Pearl, Dana Mackenzie, 2018 (Popular science book)
-* [A Crash Course in Good and Bad Controls](https://ftp.cs.ucla.edu/pub/stat_ser/r493-reprint.pdf), Carlos Cinelli, Andrew Forney, Judea Pearl, 2022
-
-
+-   [Causal Inference in Statistics: A Primer](https://www.datascienceassn.org/sites/default/files/CAUSAL%20INFERENCE%20IN%20STATISTICS.pdf), Judea Pearl, Madelyn Glymour, Nicholas P. Jewell, 2016
+-   [The book of Why](https://www.amazon.ca/Book-Why-Science-Cause-Effect/dp/B07CYCFWR7/ref=sr_1_1?hvadid=321844882793&hvdev=c&hvlocphy=9001561&hvnetw=g&hvqmt=b&hvrand=18271384037399984703&hvtargid=kwd-818874273786&hydadcr=22486_9261677&keywords=the+book+of+why+by+judea+pearl&qid=1700471749&sr=8-1), Judea Pearl, Dana Mackenzie, 2018 (Popular science book)
+-   [A Crash Course in Good and Bad Controls](https://ftp.cs.ucla.edu/pub/stat_ser/r493-reprint.pdf), Carlos Cinelli, Andrew Forney, Judea Pearl, 2022
