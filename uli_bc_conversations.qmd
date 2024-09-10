@@ -105,7 +105,7 @@ Children are in indicator species. If policies work for children, they probably 
 ![](https://doodles.mountainmath.ca/posts/2022-05-11-children-are-good-actually/index_files/figure-html/children_change-1.png)
 
 
-# The data generation process
+# Data is subject to interpretation
 
 ::: columns
 ::: {.column width="50%"}
@@ -113,12 +113,23 @@ Children are in indicator species. If policies work for children, they probably 
 :::
 
 ::: {.column width="50%"}
-We have lots of data easily available to us. But too often do we jump to conclusions based on preconceived notions.
+Different people interpret the same data differently. And that's ok.
 
-We need to pay more attention to the data generation process. What social and economic processes do we think underlay a given data series? Can we test if these theories are consistent with the data? Can we establish causal mechanisms?
+When making sense of data we should pay close attention to the data generation process. What social and economic processes do we think underlay a given data series? Can we test if these theories are consistent with the data? Can we establish causal mechanisms?
 :::
 :::
 
+# An (opinionated) perspective on urban analytics
+
+With so much data, and so much existing research, how do we move forward? Cities are complex systems, and identifying underlying demographic, social, and economic processes is hard.
+
+I put a strong emphasis on **reproducible** and **adaptable** work flows to ensure the analysis is **transparent**, can easily be updated as new data becomes available, and can be tweaked or adapted to address related questions.
+
+This means to clearly describe methods and assumptions, use publicly available data sources whenever possible, and most importantly **share your code**!
+
+Sharing your code makes it unequivocally clear what you did, it keeps you honest, and it allows others to build on your work. We need more and deeper data analysis and a wider range of people engaging in data analysis from a broad range of perspectives.
+
+Different people bring in different perspectives, make different assumptions and different choices in their analysis. Sharing your code makes it easy for others to build on your work, adapt it, and maybe even improve on it.
 
 # Thank you!
 
