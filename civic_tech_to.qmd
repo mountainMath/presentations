@@ -1,0 +1,281 @@
+---
+title: "Civic Tech Toronto"
+subtitle: "Hacknight"
+author: "Jens von Bergmann"
+date: "Oct 1, 2024"
+format: revealjs
+css: shift_heading_up.css
+editor: visual
+fontsize: 20pt
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(cansim)
+```
+
+# CensusMapper
+
+::::: columns
+::: {.column width="50%"}
+My start down the road of urban analytics was CensusMapper.
+
+CensusMapper is a flexible mapping tool to map census data Canada wide at various geographic detail mapping any combination of census variables.
+:::
+
+::: {.column width="50%"}
+<a href="https://censusmapper.ca/maps/731" target="_blank"><img src="https://doodles.mountainmath.ca/posts/2017-05-16-lifeblood/images/net_van.png"/></a>
+:::
+:::::
+
+## Suite of tools for Canadian data analysis
+
+::::::::: columns
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/cancensus/master/images/cancensus-sticker.png){width="50%"}
+
+1996-2021 Census data
+:::
+
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/cansim/master/images/cansim-sticker.png){width="50%"}
+
+Statistics Canada data tables
+:::
+
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/tongfen/master/images/tongfen-sticker.png){width="50%"}
+
+Making data on different geographies comparable
+:::
+
+::: {.column width="33%"}
+![](https://mountainmath.github.io/cmhc/reference/figures/logo.png){width="50%"}
+
+CMHC data
+:::
+
+::: {.column width="33%"}
+![](https://raw.githubusercontent.com/mountainMath/VancouvR/master/images/VancouvR-sticker.png){width="50%"}
+
+City of Vancouver Open Data
+:::
+
+::: {.column width="33%"}
+![](https://mountainmath.github.io/canbank/logo.svg){width="50%"}
+
+Bank of Canada data
+:::
+:::::::::
+
+# Income mixing and segregation
+What's the geography of income in Toronto? Adjusted family income takes into account family size, we map the proportions of low, middle and high income people to show how they mix.
+
+::::: columns
+::: {.column width="50%"}
+```{r include = FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(mountainmathHelpers)
+
+align_toronto <- function(data){
+  rot = function(a) matrix(c(cos(a), sin(a), -sin(a), cos(a)), 2, 2)
+  data %>% 
+    sf::st_transform(mountainmathHelpers::lambert_conformal_conic_at(.)) %>%
+    mutate(geometry=geometry * rot(pi/180*17.3))
+}
+
+add_tric_legend <- function(key){
+  list(
+    scale_fill_identity(),
+    geom_water(),
+    geom_roads(),
+    coord_sf(datum=NA),
+    theme(plot.margin = unit(c(0.1,0.1,6.5,0.1), "cm")),
+    annotation_custom(ggtern::ggplotGrob(key + theme(
+      panel.background = element_rect(fill='transparent'),
+      plot.background = element_rect(fill='transparent', color=NA))),
+      xmin = -20195.468, xmax = 22668.318, ymin = -12010*3, ymax = -12010)
+  )
+}
+```
+```{r echo=TRUE, warning=FALSE,message=FALSE, eval=FALSE, fig.width=7, fig.height=6}
+library(tidyverse)
+library(cancensus)
+
+ef_deciles <- c(
+  "v_CA21_1106", "v_CA21_1109", "v_CA21_1112", 
+  "v_CA21_1115", "v_CA21_1118", "v_CA21_1124", "v_CA21_1127", 
+  "v_CA21_1130", "v_CA21_1133", "v_CA21_1136")
+
+ef_data <- get_census(
+  dataset="2021",regions=list(CSD="3520005"), 
+  vectors=ef_deciles, level="CT", 
+  geo_format="sf",labels="short") |>
+  align_toronto() |>
+  mutate(Bottom=v_CA21_1106+v_CA21_1109+v_CA21_1112,
+         Middle=v_CA21_1115+v_CA21_1118+v_CA21_1124+v_CA21_1127,
+         Top=v_CA21_1130+v_CA21_1133+v_CA21_1136)
+
+tric <- tricolore::Tricolore(
+  ef_data, breaks = 4,
+  p1='Bottom', p2='Middle', p3='Top')
+
+ef_data |>
+  mutate(col=tric$rgb) |>
+  ggplot(aes(fill=col)) +
+  geom_sf() +
+  add_tric_legend(tric$key) +
+  labs(title="Toronto adjusted family income groups",
+       caption="StatCan Census 2021")
+```
+
+:::
+
+::: {.column width="50%"}
+```{r echo=FALSE, warning=FALSE,message=FALSE, eval=TRUE, fig.width=7, fig.height=6, crop=TRUE}
+library(tidyverse)
+library(cancensus)
+
+ef_deciles <- c("v_CA21_1106", "v_CA21_1109", "v_CA21_1112", 
+                "v_CA21_1115", "v_CA21_1118", "v_CA21_1124", "v_CA21_1127", 
+                "v_CA21_1130", "v_CA21_1133", "v_CA21_1136")
+
+ef_data <- get_census("2021",regions=list(CSD="3520005"), vectors=ef_deciles, 
+                      level="CT", geo_format="sf",labels="short") |>
+  align_toronto() |>
+  mutate(Bottom=v_CA21_1106+v_CA21_1109+v_CA21_1112,
+         Middle=v_CA21_1115+v_CA21_1118+v_CA21_1124+v_CA21_1127,
+         Top=v_CA21_1130+v_CA21_1133+v_CA21_1136) 
+
+tric <- tricolore::Tricolore(ef_data, p1 = 'Bottom', p2 = 'Middle', p3 = 'Top',breaks = 4)
+
+ef_data |>
+  mutate(col=tric$rgb) |>
+  ggplot(aes(fill=col)) +
+  geom_sf() +
+  add_tric_legend(tric$key) +
+  labs(title="Toronto adjusted family income",
+       caption="StatCan Census 2021")
+```
+:::
+:::::
+
+# Population over time
+
+<a href="https://doodles.mountainmath.ca/html/yyz_pop_timeline_2021.html" target="_blank"><img src="images/tor_pop_change_3d.png" height=400></a>
+
+Toronto has grown since the 70s, but it hasn't grown uniformly. Where has population grown, when, and by how much? The *cancensus* and *tongfen* packages [make it easy](https://doodles.mountainmath.ca/posts/2024-04-23-population-timelines-update/) to explore these questions.
+
+
+# Income over time
+
+::::: columns
+::: {.column width="50%"}
+
+The *cansim* package allows easy access to StatCan tables, let's take a look at median income of the prime age working population over time.
+
+We can access data by table number, or by vector if we want individual time series.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(cansim)
+income_data <- get_cansim("11-10-0239") |>
+  filter(grepl("Toron|Montr|Vancou|Calg|Ott",GEO),
+         Sex=="Both sexes",
+         Statistics=="Median income (excluding zeros)",
+         `Income source`=="Total income",
+         `Age group` =="25 to 54 years") |>
+  mutate(Name=gsub(", .+","",GEO))
+```
+
+This data is taken from [Table 11-10-0239](https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1110023901), we can explore the data on the web first or inspect the data after downloading. Or query the metadata programmatically.
+
+:::
+::: {.column width="50%"}
+```{r warning=FALSE,message=FALSE, echo=TRUE, fig.width=7, fig.height=4}
+ggplot(income_data,
+       aes(x=Date,y=val_norm,color=Name,label=Name)) +
+  geom_line() +
+  geom_point(data=~filter(.,Date==max(Date))) +
+  ggrepel::geom_text_repel(
+    data=~filter(.,Date==max(Date)),hjust=-0.1,
+    color='black',direction="y",size=4) +
+  scale_y_continuous(labels=scales::dollar) +
+  scale_color_brewer(palette="Dark2",guide=FALSE) +
+  expand_limits(x=as.Date("2033-01-01")) +
+  labs(title="Median income of 25 to 54 year olds", 
+       x=NULL, y="2022 constant dollars",
+       caption="StatCan Table 11-10-0239")
+```
+:::
+:::::
+
+# Toronto under construction
+The various packages play well together, e.g. combining CMHC and census data. 
+
+```{r toronto-under-construction, echo=TRUE, message=FALSE, warning=FALSE, fig.width=8, crop=TRUE}
+completions <- cmhc::get_cmhc(survey = "Scss", series = "Completions", dimension = "Dwelling Type", year = "2023",
+                              breakdown = "Census Tracts",  frequency="annual", geo_uid="3520005") |>
+  filter(`Dwelling Type`=="All")
+
+cancensus::get_census("2021",regions=list(CSD="3520005"),  level="CT", geo_format="sf") |> 
+  align_toronto() |>
+  left_join(completions, by="GeoUID") |>
+  mutate(Value_d=pretty_cut(Value,c(-Inf,0,10,50,100,250,500,750,1000,Inf))) |>
+  ggplot(aes(fill=Value_d)) +
+  geom_sf() +
+  scale_fill_viridis_d(na.value="darkgrey") +
+  coord_sf(datum=NA) +
+  labs(title="Dwelling units completed in the City of Toronto in 2023",
+       fill="# Units", caption="CMHC Scss")
+```
+
+
+
+# Data is subject to interpretation
+
+::::: columns
+::: {.column width="50%"}
+![](https://github.com/mountainMath/xkcd_exponential/raw/main/rental_xkcd_files/figure-gfm/unnamed-chunk-1-1.png)
+:::
+
+::: {.column width="50%"}
+Different people interpret the same data differently. And that's ok.
+
+When making sense of data we should pay close attention to the data generation process. What social and economic processes do we think underlay a given data series? Can we test if these theories are consistent with the data? Can we establish causal mechanisms?
+:::
+:::::
+
+# An (opinionated) perspective on (urban) analytics
+
+With so much data, and so much existing research, how do we move forward? Cities are complex systems, and identifying underlying demographic, social, and economic processes is hard.
+
+I put a strong emphasis on **reproducible** and **adaptable** work flows to ensure the analysis is **transparent**, can easily be updated as new data becomes available, and can be tweaked or adapted to address related questions.
+
+This means to clearly describe methods and assumptions, use publicly available data sources whenever possible, and most importantly **share your code**!
+
+Sharing your code makes it unequivocally clear what you did, it keeps you honest, and it allows others to build on your work. We need more and deeper data analysis and a wider range of people engaging in data analysis from a broad range of perspectives.
+
+Different people bring in different perspectives, make different assumptions and different choices in their analysis. Sharing your code makes it easy for others to build on your work, adapt it, and maybe even improve on it.
+
+# Canadain Data Book project
+
+We have a lot of good data in Canada, but are sorely lacking in analysis. I am envisioning a world where more people in the broader public incorporate data into their work, share their code, and build a community of practice with interactively deeper analysis. 
+
+[![](images/book_banner.png)](https://mountainmath.github.io/canadian_data/)
+
+I have started a [Book project](https://mountainmath.github.io/canadian_data/) to smooth the way for newcomers to learn about Canadian data and data analysis, it's structured as a problem-based learning project with focus on Canada, new cases are still getting added when I get around to it.
+
+# Thank you!
+
+Thanks for bearing with me. These slides are online at <https://mountainmath.ca/civic_tech_to/> and the source code lives [on GitHub](https://github.com/mountainMath/presentations/blob/master/civic_tech_to.qmd). More background with additional code on the topics discussed are on my blog at
+
+-   [Understanding income distributions across geographies and time](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time/)
+-   [Net migration (on CensusMapper)](https://censusmapper.ca/maps/731)
+-   [Population timelines](https://doodles.mountainmath.ca/posts/2024-04-23-population-timelines-update/)
+
+You can reach me on [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), via [email (jens@mountainmath.ca)](mailto::jens@mountainmath.ca) and with decreasing frequency on [Twitter (\@vb_jens)](https://twitter.com/vb_jens)
