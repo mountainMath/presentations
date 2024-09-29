@@ -1,6 +1,6 @@
 ---
-title: "Civic Tech Toronto"
-subtitle: "Hacknight"
+title: "Canadian Census and other data"
+subtitle: "Civic Tech Toronto Hachnight"
 author: "Jens von Bergmann"
 date: "Oct 1, 2024"
 format: revealjs
@@ -250,6 +250,7 @@ When making sense of data we should pay close attention to the data generation p
 :::
 :::::
 
+<!--
 # An (opinionated) perspective on (urban) analytics
 
 With so much data, and so much existing research, how do we move forward? Cities are complex systems, and identifying underlying demographic, social, and economic processes is hard.
@@ -261,7 +262,7 @@ This means to clearly describe methods and assumptions, use publicly available d
 Sharing your code makes it unequivocally clear what you did, it keeps you honest, and it allows others to build on your work. We need more and deeper data analysis and a wider range of people engaging in data analysis from a broad range of perspectives.
 
 Different people bring in different perspectives, make different assumptions and different choices in their analysis. Sharing your code makes it easy for others to build on your work, adapt it, and maybe even improve on it.
-
+-->
 # Canadain Data Book project
 
 We have a lot of good data in Canada, but are sorely lacking in analysis. I am envisioning a world where more people in the broader public incorporate data into their work, share their code, and build a community of practice with interactively deeper analysis. 
@@ -272,10 +273,17 @@ I have started a [Book project](https://mountainmath.github.io/canadian_data/) t
 
 # Thank you!
 
-Thanks for bearing with me. These slides are online at <https://mountainmath.ca/civic_tech_to/> and the source code lives [on GitHub](https://github.com/mountainMath/presentations/blob/master/civic_tech_to.qmd). More background with additional code on the topics discussed are on my blog at
+Thanks for bearing with me. These slides are online at <https://mountainmath.ca/civic_tech_to/> and the source code lives [on GitHub](https://github.com/mountainMath/presentations/blob/master/civic_tech_to.qmd). More background with additional code on the topics discussed
 
--   [Understanding income distributions across geographies and time](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time/)
--   [Net migration (on CensusMapper)](https://censusmapper.ca/maps/731)
--   [Population timelines](https://doodles.mountainmath.ca/posts/2024-04-23-population-timelines-update/)
+-   Background on [visualizing income distributions](https://doodles.mountainmath.ca/posts/2018-10-28-understanding-income-distributions-across-geographies-and-time/)  across space and time
+-   Net migration [on CensusMapper](https://censusmapper.ca/maps/731)
+-   Toronto and Vancouver [population timelines](https://doodles.mountainmath.ca/posts/2024-04-23-population-timelines-update/)
+-   Canadian data [book project](https://mountainmath.github.io/canadian_data/)
+-   More examples with code on [my blog](https://doodles.mountainmath.ca)
 
-You can reach me on [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), via [email (jens@mountainmath.ca)](mailto::jens@mountainmath.ca) and with decreasing frequency on [Twitter (\@vb_jens)](https://twitter.com/vb_jens)
+You can reach me at
+
+-   [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social)
+-   [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/)
+-   [email (jens@mountainmath.ca)](mailto::jens@mountainmath.ca)
+-   and with decreasing frequency on [Twitter (\@vb_jens)](https://twitter.com/vb_jens)
