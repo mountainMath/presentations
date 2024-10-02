@@ -1,6 +1,6 @@
 ---
 title: "Canadian Census and other data"
-subtitle: "Civic Tech Toronto Hachnight"
+subtitle: "Civic Tech Toronto Hacknight"
 author: "Jens von Bergmann"
 date: "Oct 1, 2024"
 format: revealjs
