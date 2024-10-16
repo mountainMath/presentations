@@ -1,0 +1,387 @@
+---
+title: "Housing Needs Assessments and Targets"
+subtitle: "PLN Webinar"
+author: 
+  name: "Jens von Bergmann"
+  affiliation: "MountainMath Software and Analytics"
+format: 
+  revealjs:
+    #logo: mm_stamp_alpha.png
+    css: ["default","default-fonts"]
+    theme: mm_theme.scss
+    background-color: #F8F4F0
+#css: shift_heading_up.css
+editor: visual
+fontsize: 20pt
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+## Housing Needs Assessments and Targets
+
+Municipalities in BC and elsewhere are now required to produce Housing Needs Reports, and municipalities face housing targets.
+
+
+
+## Housing Needs Assessments and Targets
+
+Municipalities in BC and elsewhere are now required to produce Housing Needs Reports, and municipalities face housing targets.
+
+Won't address the specific requirements and methods implemented in B.C., instead try to understand background and theory around Housing Needs Assessments and Targets in general.
+
+What problem are Housing Needs Reports and Targets trying to fix?
+
+
+## Housing Needs Assessments and Targets
+
+Municipalities in BC and elsewhere are now required to produce Housing Needs Reports, and municipalities face housing targets.
+
+Won't address the specific requirements and methods implemented in B.C., instead try to understand background and theory around Housing Needs Assessments and Targets in general.
+
+What problem are Housing Needs Reports and Targets trying to fix?
+
+::: {style="margin-top: 20px; font-size: 3em; color: red;"}
+We have a housing shortage
+:::
+
+#### Guiding question:
+
+-   How much overall housing is needed, and
+-   how much non-market housing or cash supports are need to ensure everyone has access to housing?
+
+
+## Do we have enough housing?
+
+What are the best metrics for understanding if a given place has enough housing, just the right amount, or too much? Whether you’re a potential renter or buyer or an analyst or policymaker, the answer really depends on what you’re looking for:
+
+## Do we have enough housing?
+
+What are the best metrics for understanding if a given place has enough housing, just the right amount, or too much? Whether you’re a potential renter or buyer or an analyst or policymaker, the answer really depends on what you’re looking for:
+
+-   For potential renters and buyers, if you can’t find what you’re looking for and/or it’s not in your price range, then there’s not enough housing.
+
+
+## Do we have enough housing?
+
+What are the best metrics for understanding if a given place has enough housing, just the right amount, or too much? Whether you’re a potential renter or buyer or an analyst or policymaker, the answer really depends on what you’re looking for:
+
+-   For potential renters and buyers, if you can’t find what you’re looking for and/or it’s not in your price range, then there’s not enough housing.
+-   If you can find it, then there’s just the right amount.
+
+
+## Do we have enough housing?
+
+What are the best metrics for understanding if a given place has enough housing, just the right amount, or too much? Whether you’re a potential renter or buyer or an analyst or policymaker, the answer really depends on what you’re looking for:
+
+-   For potential renters and buyers, if you can’t find what you’re looking for and/or it’s not in your price range, then there’s not enough housing.
+-   If you can find it, then there’s just the right amount.
+-   When is there too much housing? Mostly if you’re already comfortably housed, but concerned about changes to your neighbourhood and/or you’re looking to maximize the price you can get for selling your housing.
+
+
+## Do we have enough housing?
+
+What are the best metrics for understanding if a given place has enough housing, just the right amount, or too much? Whether you’re a potential renter or buyer or an analyst or policymaker, the answer really depends on what you’re looking for:
+
+-   For potential renters and buyers, if you can’t find what you’re looking for and/or it’s not in your price range, then there’s not enough housing.
+-   If you can find it, then there’s just the right amount.
+-   When is there too much housing? Mostly if you’re already comfortably housed, but concerned about changes to your neighbourhood and/or you’re looking to maximize the price you can get for selling your housing.
+
+
+Fundamentally, it's a question about <span style="color:red;">values<span>, and we should make underlying values explicit.
+
+So how does this inform Housing Needs Assessments and Targets?
+
+
+## Values assumed in this presentation
+
+<h1 style="margin-top:100px">
+
+Housing is good, actually!
+
+</h1>
+
+People derive tremendous value from living in housing.
+
+Housing provides shelter, location, and privacy.
+
+We should broadly allow housing, especially in places near jobs and amenities, and make sure everyone has access to it.
+
+## What's a housing shortage?
+
+The simple answer is "too many people for too few homes", but what does that mean in practice?
+
+People adapt to a housing shortage in three ways:
+
+
+## What's a housing shortage?
+
+The simple answer is "too many people for too few homes", but what does that mean in practice?
+
+People adapt to a housing shortage in three ways:
+
+-   go without housing (visible or hidden homelessness)
+
+## What's a housing shortage?
+
+The simple answer is "too many people for too few homes", but what does that mean in practice?
+
+People adapt to a housing shortage in three ways:
+
+-   go without housing (visible or hidden homelessness)
+-   move away or don't come in the first place (migration response)
+
+## What's a housing shortage?
+
+The simple answer is "too many people for too few homes", but what does that mean in practice?
+
+People adapt to a housing shortage in three ways:
+
+-   go without housing (visible or hidden homelessness)
+-   move away or don't come in the first place (migration response)
+-   move or remain together (double up) despite preferring to live separately
+
+## What's a housing shortage?
+
+The simple answer is "too many people for too few homes", but what does that mean in practice?
+
+People adapt to a housing shortage in three ways:
+
+-   go without housing (visible or hidden homelessness)
+-   move away or don't come in the first place (migration response)
+-   move or remain together (double up) despite preferring to live separately
+
+Doubling up, delaying or reducing household formation, is the **main channel** by which people adjust to a housing shortage.
+
+## How are people doubling up?
+
+::::: columns
+::: {.column width="70%"}
+![](images/non-mhu.svg)
+:::
+
+::: {.column width="30%"}
+We often think of families and households as synonymous, but that blinds us to see how people are doubling up.
+
+#### MHU:
+
+-   adult living alone
+-   couple
+-   couple with dependent children
+-   single parent with dependent children
+:::
+:::::
+
+Minimal Household Units (MHU) is a useful concept to disentangle this.
+
+## Doubling up across Canada
+
+Rates of doubling up vary across Canada.
+
+![](images/non-mhu-share.svg)
+
+# Housing 101
+
+:::::: columns
+::: {.column width="60%"}
+People double up in response to high rents.
+
+![](images/mhu-share-rent.svg)
+:::
+
+:::: {.column width="40%"}
+::::
+::::::
+
+
+# Housing 101
+
+:::::: columns
+::: {.column width="60%"}
+People double up in response to high rents.
+
+![](images/mhu-share-rent.svg)
+:::
+
+:::: {.column width="40%"}
+-   Relationship is quite uniform across census years.
+::::
+::::::
+
+
+# Housing 101
+
+:::::: columns
+::: {.column width="60%"}
+People double up in response to high rents.
+
+![](images/mhu-share-rent.svg)
+:::
+
+:::: {.column width="40%"}
+-   Relationship is quite uniform across census years.
+-   Range expands with rising rents & doubling up.
+::::
+::::::
+
+
+# Housing 101
+
+:::::: columns
+::: {.column width="60%"}
+People double up in response to high rents.
+
+![](images/mhu-share-rent.svg)
+:::
+
+:::: {.column width="40%"}
+-   Relationship is quite uniform across census years.
+-   Range expands with rising rents & doubling up.
+-   Curves shift rightward because of real income growth, hinting at some other factors at play too.
+::::
+::::::
+
+
+# Housing 101
+
+:::::: columns
+::: {.column width="60%"}
+People double up in response to high rents.
+
+![](images/mhu-share-rent.svg)
+:::
+
+:::: {.column width="40%"}
+-   Relationship is quite uniform across census years.
+-   Range expands with rising rents & doubling up.
+-   Curves shift rightward because of real income growth, hinting at some other factors at play too.
+-   Next to variation in income across metros, variation in cultural acceptance of shared living arrangement also matters.
+::::
+::::::
+
+
+# Housing 101
+
+:::::: columns
+::: {.column width="60%"}
+People double up in response to high rents.
+
+![](images/mhu-share-rent.svg)
+:::
+
+:::: {.column width="40%"}
+-   Relationship is quite uniform across census years.
+-   Range expands with rising rents & doubling up.
+-   Curves shift rightward because of real income growth, hinting at some other factors at play too.
+-   Next to variation in income across metros, variation in cultural acceptance of shared living arrangement also matters.
+-   Even accounting for this, the relationship with rents remains largely unchanged.
+::::
+::::::
+
+
+# Housing 101
+
+:::::: columns
+::: {.column width="60%"}
+People double up in response to high rents.
+
+![](images/mhu-share-rent.svg)
+:::
+
+:::: {.column width="40%"}
+-   Relationship is quite uniform across census years.
+-   Range expands with rising rents & doubling up.
+-   Curves shift rightward because of real income growth, hinting at some other factors at play too.
+-   Next to variation in income across metros, variation in cultural acceptance of shared living arrangement also matters.
+-   Even accounting for this, the relationship with rents remains largely unchanged.
+::::
+::::::
+
+::: {style="font-size: 1.3em; color: red;"}
+Housing shortage, people doubling up, and high rents are closely linked.
+:::
+
+
+
+## Implications for HNR and Targets
+
+-   Relationship between rents and doubling up provides a useful way to assess impact of shortages.
+-   We cannot improve housing outcomes without undoing shortages.
+-   Households are **outcomes** of affordability, and household based metrics are blind to that. Care must be taken when using household-based metrics to inform housing need or targets to avoid bias. Prominent household-based metrics are:
+    -   Core Housing Need
+    -   Breakdown of households by bedroom count or need (e.g. NOS)
+
+
+## Implications for HNR and Targets
+
+-   Relationship between rents and doubling up provides a useful way to assess impact of shortages.
+-   We cannot improve housing outcomes without undoing shortages.
+-   Households are **outcomes** of affordability, and household based metrics are blind to that. Care must be taken when using household-based metrics to inform housing need or targets to avoid bias. Prominent household-based metrics are:
+    -   Core Housing Need
+    -   Breakdown of households by bedroom count or need (e.g. NOS)
+
+Example:
+
+-   30 year old living with parents lives in *very* affordable housing, the combined household income of parents and 30 year old is likely high compared to their running shelter costs.
+-   If 30 year old chooses to move out and rent a place, they may well be stretched for shelter costs. But their life (and their parent's) likely materially improved
+
+## Caveats for HNR and Targets
+
+-   Undoing shortages can also trigger migration responses, especially in high-demand regions, slowing progress in undoing shortages.
+    -   Migration response at the national level is minimal.
+    -   Inter-regional migration response is dominated by labour markets, but housing costs have some impact too.
+    -   Local (within region) migration response to housing can be quite strong.
+-   Doubling up operates at the metro (CMA/CA) level, of limited use at the municipal level. (Where people are doubled up may be different from where they want to form their own household.)
+-   Targets need to also estimate future demand growth, which is difficult. Population growth is endogenous to housing growth, income growth is hard to predict. Need to make assumptions about these demand factors.
+
+## How should we assess housing need and targets?
+
+Prices and rents offer the most robust and direct way to assess housing need and targets. Best way to understand local housing shortfall:
+
+Compare **marginal (social) cost of construction** to **prices and rents** for new housing.
+
+In 2019 [CMHC estimated the wedge](https://eppdscrmssa01.blob.core.windows.net/cmhcprodcontainer/sf/project/archive/research_5/rr_supply_constraints_increased_prices_mar_12.pdf) between prices and marginal cost of construction, in the City of Vancouver prices were 89% above construction cost, in Surrey it was 20%.
+
+![](images/cmhc_wedge_vancouver.png)
+
+We can turn these into targets by asking how much housing we need to build to bring prices and rents of new housing back in line with marginal cost of construction.
+
+## Housing Shortfall estimates
+
+To estimate housing shortfall we use estimates of household formation and migration response to adding housing. These come with uncertainties, but [give us ballpark estimate of the shortfall](https://doodles.mountainmath.ca/posts/2023-06-27-housing-targets/). Leave 10% for *social* cost, e.g. DCLs.
+
+![](https://doodles.mountainmath.ca/posts/2023-06-27-housing-targets/index_files/figure-html/housing-shortfall2-1.png)
+
+## Distributional effects and need for non-market housing
+
+Overall shortage and target estimates can help ensure there is enough housing, but how to assess/ensure everyone has access to housing?
+
+New housing is expensive. But most housing is old housing, and most moves are moves into old housing. We need to understand the effects of undoing shortages on prices and rents of old housing.
+
+-   Undoing shortages lowers prices and rents of all housing. This reduces the need for non-market housing or cash subsidies.
+-   Undoing shortages increases household formation, this lowers household incomes and thus paradoxically may increase need for non-market housing and cash subsidies.
+-   Supply effects operate regionally, undoing shortages in one municipality also affects prices and rents in a neighbouring one.
+
+## Distributional effects when meeting targets
+
+Undoing shortages leads to significant reductions in rent-burden (keeping households fixed), but [still leaves a large need for non-market housing and cash supports](https://doodles.mountainmath.ca/posts/2024-08-14-distributional-effects-of-adding-housing/).
+
+![](https://doodles.mountainmath.ca/posts/2024-08-14-distributional-effects-of-adding-housing/index_files/figure-html/fig-cash-supports5-1.png)
+
+## Thank you!
+
+These slides are online at <https://mountainmath.ca/pln_hnr/>. More background with code for the analysis and images in this talk can be found at:
+
+-   Discussions on [households and household composition](https://doodles.mountainmath.ca/posts/2017-12-01-what-s-a-household/)
+-   Simple [metrics for deciding if we have enough housing](https://doodles.mountainmath.ca/posts/2019-06-12-simple-metrics-for-deciding-if-you-have-enough-housing/)
+-   Analysis on [suppressed households in Canadian metro areas](https://doodles.mountainmath.ca/posts/2022-05-06-estimating-suppressed-household-formation/index.html)
+-   More on [suppressed households and CMHC housing supply gap](https://doodles.mountainmath.ca/posts/2022-10-03-still-short-suppressed-households-in-2021/index.html)
+-   Background and context on [Minimal Household Units](https://doodles.mountainmath.ca/posts/2023-08-17-housing-outcomes/)
+-   Background on [Housing Targets](https://doodles.mountainmath.ca/posts/2023-06-27-housing-targets/)
+-   [Distributional effects](https://doodles.mountainmath.ca/posts/2024-08-14-distributional-effects-of-adding-housing/) of adding housing
+-   Doubling up - [distinguishing families from households](https://doodles.mountainmath.ca/posts/2024-06-04-doubling-up-distinguishing-families-from-households/)
+-   A look at [effects of housing costs on migration](https://doodles.mountainmath.ca/posts/2024-06-11-migration-and-housing-costs/)
+
+You can reach me at [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), [email (jens\@mountainmath.ca)](mailto::jens@mountainmath.ca), and with decreasing frequency on [Twitter (\@vb_jens)](https://twitter.com/vb_jens)

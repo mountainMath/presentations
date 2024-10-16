@@ -1,0 +1,126 @@
+---
+title: "PLN HNR Overflow"
+format: revealjs
+---
+
+## Some history
+
+US has nice long timelines to estimate household formation.
+
+![](images/age_expected_hh_us.png)
+
+## Canadian history
+Similar trends in Canada, household formation peaked in 1980 in most of Canada. 
+
+![](images/age_expected_hh_canada.png)
+
+
+## What changed?
+
+In Vancouver we downzoned most of the city in the 1970s and transitioned to a highly disretionary planning system. At the regional level we transitioned from planning to accommodate growth to planning to "manage" growth.
+
+Discretionary planning systems remove or heavily reduce the ability of the market to repsond to demand signals. In it's place we took a planning economy approach.
+
+![](https://doodles.mountainmath.ca/posts/2022-04-26-planning-for-scarcity/index_files/figure-html/pop_dw_model_naive-1.png)
+
+
+## Planning for scarcity
+
+This approach to planning for housing is fundamentally flawed and systematically leads to housing shortages. 
+
+![](https://doodles.mountainmath.ca/posts/2022-04-26-planning-for-scarcity/index_files/figure-html/pop_dw_model_policy_leaver-1.png)
+
+
+
+## How much housing do we need to avoid doubling up?
+
+:::: columns
+::: {.column width="60%"}
+
+![](images/non-mhu-shortfall.svg)
+:::
+::: {.column width="40%"}
+An upper bound is when every minimal household unit has their own home.
+
+Québec metro area suggests that some doubling up is voluntary and not necessarily a sign of a housing shortage.
+
+
+:::
+::::
+
+## Unravelling shortages (sliding down the demand curve)
+
+:::: columns
+::: {.column width="60%"}
+
+![](images/non-mhu-shortfall-rents.svg)
+:::
+::: {.column width="40%"}
+
+We can again relate this to rents and estimate how adding housing reduces doubling up.
+
+*   To reduce doubling up in Vancouver to the same rates seen in Montréal, we need 16% more housing while keeping the population fixed.
+*   This would reduce rents by about 35%, but that would likely increase in-migration and lower out-migration, so population would not be fixed and the actual reduction in rents would be less.
+
+:::
+::::
+
+
+
+# Central insight
+
+::: {style="font-size: 1.3em;text-align: center;margin:40px;"}
+Households are **outcomes** of housing affordability. 
+:::
+
+This has important implications for planning.
+
+. . . 
+
+Household-based metrics like Core Housing Need or shelter-cost-to-income ratios are blind to the impact on household formation. ("Collider bias")
+
+
+Example:
+
+* 30 year old living with parents lives in *very* affordable housing, the combined household income of parents and 30 year old is likely high compared to their running shelter costs.
+* If 30 year old moves out and rents a place, they may well be stretched for shelter costs. But their life (and their parent's) likely materially improved, otherwise they would not have moved out.
+
+. . . 
+
+::: {style="font-size: 1.3em;text-align: center;margin:40px;"}
+Focusing *too much* on household-based metrics can lead us to wrong conclusions.
+:::
+
+
+
+
+## How should we deal with housing shortages?
+
+Three options:
+
+:::: columns
+::: {.column width="30%" .fragment}
+
+::: {style="padding-top:100px;font-size:1.1em;"}
+Build more housing!
+:::
+:::
+
+::: {.column width="30%" .fragment}
+
+::: {style="padding-top:70px;font-size:1.1em;"}
+Doubling up ain't so bad, neighbourhood character matters more!
+:::
+:::
+
+::: {.column width="30%" .fragment}
+::: {style="padding-top:40px;font-size:1.1em;"}
+![](images/thanos-snap.jpeg.webp)
+:::
+:::
+::::
+
+## Targets are a bridge
+
+Targets help get us back on track. Soon municipalities will have to ensure there is enough **outright zoning** to accommodate 20 years worth of housing needs. 
+

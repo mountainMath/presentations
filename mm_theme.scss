@@ -1,0 +1,16 @@
+/*-- scss:defaults --*/
+
+$body-bg: #F8F4F0 !default;
+
+.reveal .slide-logo {
+  display: block;
+  position: fixed;
+  top: unset !important;
+  left: unset !important;
+  bottom: 5px;
+  right: 12px;
+  height: 100px !important;
+  width: 100x !important;
+  max-width: unset !important;
+  max-height: unset !important;
+}
