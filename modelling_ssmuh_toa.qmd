@@ -1,0 +1,191 @@
+---
+title: "Modelling SSMUH and TOAs"
+subtitle: "Metro Vancouver RPAC-FAD"
+data: "Oct 24, 2024"
+author: 
+  name: "Jens von Bergmann"
+  affiliation: "MountainMath Software and Analytics"
+format: 
+  revealjs:
+    logo: mm_stamp_alpha.png
+    css: ["default","default-fonts"]
+    theme: mm_theme.scss
+    background-color: #F8F4F0
+#css: shift_heading_up.css
+editor: visual
+fontsize: 20pt
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+## Modelling SSMUH and TOAs
+
+
+:::: columns
+::: {.column width="50%"}
+Overview over modelling work to estimate effects of provincial SSMUH and TOA policies.
+
+![](images/ssmuh_toa_report.png)
+
+:::
+::: {.column width="50%"}
+### Goal of modelling:
+
+*   estimating build out of housing due to SSMUH and TOA policies
+*   estimate effects on housing prices (and rents)
+*   run across a broad range of assumptions, e.g. demand growth, size of supply effects, etc
+
+*   broad socio-economic outcomes
+*   some specific question, e.g. effect of enhanced renter protections in TOAs
+
+
+:::
+::::
+
+
+# SSMUH
+
+Guidelines from ministry:
+
+* allow 4 units on every lot
+* 6 within the frequent transit network
+* around 50% lot coverage, 3 stories
+
+We broadly interpreted this as allowing up 1.5 FSR, enabled through outright development with short approval timelines. At grade parking. Approval time of a month or two.
+
+# TOAs
+
+Guidelines from ministry:
+
+* list of transit stations
+* annular buffers with prescribed minimum allowable densities
+
+We modelled this as wood frame for up to 3 FSR areas and concrete for above 3 FSR, with underground parking. Approval times between 1 and two years depending on form.
+
+
+## How to model policy impact?
+
+:::: columns
+::: {.column width="70%"}
+
+![](images/model_overview.png)
+:::
+
+::: {.column .incremental width="30%"}
+*   For each eligible parcel and year, estimate development profitability, probability of availability for redevelopment. 
+*   Incorporate demand growth scenarios and feedback for multiplex/apartment sale prices (supply effect) and land prices (increasing multiplex/apartment land scarcity).
+*   Iterate every year. 
+:::
+::::
+
+## Price model
+
+![](images/yvr_price_model.png)
+
+## Cost model
+
+The cost model assembled data and estimates for 
+
+*   hard costs for 
+    -   relevant building typologies 
+    -   at different construction quality levels 
+    -   in different parts of the region
+*   soft cost
+*   contingencies
+*   profit expectations
+*   financing
+*   land costs (possibly with assembly premium)
+*   development charges
+*   other applicable taxes
+
+## Development option
+
+![](images/yvr_development_option.png)
+
+## How to model redevelopment?
+
+:::: columns
+::: {.column width="50%"}
+#### SSMUH{.center}
+
+Parcels randomly come up for sale at rates similar to historical rates.
+
+When they do, check development potential based on value of existing use vs expected multiplex sale prices and determine probability of redevelopment.
+
+:::
+
+::: {.column width="50%"}
+#### TOA{.center}
+
+Development on existing low density parcels might require assembly of neighbouring parcels (selling at a premium). 
+
+Development of higher density parcels is idiosyncratic and difficult to predict.
+
+Assume a variety of ACC/IZ scenarios in determining profitability and redevelopment probability.
+
+:::
+::::
+
+Total redevelopment is capped by labour market capacity. Modelled to expand in size (and productivity) similar to New Zealand.
+
+
+## Metro Vancouver estimates
+
+Estimated effects of SSMUH and TOA policies on Metro Vancouver over 10 years:
+
+*   Around 140,000 to 174,000 net new dwelling units expected above business as usual (13% and 16% increase in stock)
+*   The added housing supply is expected to suppress prices between 10% and 30% below BAU scenarios
+
+. . .
+
+### Assumptions and caveats
+
+*   Assumes fast approval times
+*   Assumes faithful implementation of SSMUH with minimal ACCs is any
+*   Assumes ACCs set to keep development in TOAs broadly viable to encourage development
+*   Interest rate changes may affect shorter term projections
+*   SSMUH and TOA zoning is not optimal, it leaves some areas under-zoned and is (currently) not viable in others
+*   ... (more in the report)
+
+## Metro Vancouver context
+
+How does this relate to growth, who is going to move into those new homes?
+
+:::: columns
+::: {.column width="60%"}
+
+
+![](images/mhu-share-rent.svg)
+
+
+:::
+::: {.column width="40%"}
+
+::: {.incremental}
+
+*   Vancouver has high rates of doubling up, people pool resources to make housing work.
+
+*   People double up in response to high rents/prices, and rents/prices are set by the richest doubled-up family or individual looking to live on their own.
+
+*   Improving housing outcomes means to build enough homes to allow families and individuals to better distribute over housing.
+
+:::
+
+:::
+::::
+
+Household formation in Metro Vancouver peaked in 1981 and steadily declined since.
+
+
+# Thank you!
+
+::: {style="padding-top:100px;"}
+:::
+
+These slides are online at <https://mountainmath.ca/modelling_ssmuh_toa/>. 
+
+More background and detailed discussion can be found in the [modelling report](https://news.gov.bc.ca/files/bc_SSMUH_TOA_scenarios_Final.pdf).
+
