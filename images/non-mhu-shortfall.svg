@@ -212,7 +212,7 @@
 <text x='475.44' y='162.60' style='font-size: 8.80px; font-family: "Times New Roman";' textLength='17.60px' lengthAdjust='spacingAndGlyphs'>2021</text>
 <text x='475.44' y='179.88' style='font-size: 8.80px; font-family: "Times New Roman";' textLength='17.60px' lengthAdjust='spacingAndGlyphs'>2016</text>
 <text x='475.44' y='197.16' style='font-size: 8.80px; font-family: "Times New Roman";' textLength='17.27px' lengthAdjust='spacingAndGlyphs'>2011</text>
-<text x='252.00' y='14.21' text-anchor='middle' style='font-size: 13.20px; font-family: "Times New Roman";' textLength='322.73px' lengthAdjust='spacingAndGlyphs'>Minimum added dwellings needed to avoid any 'doubling up'</text>
+<text x='252.00' y='14.21' text-anchor='middle' style='font-size: 13.20px; font-family: "Times New Roman";' textLength='453.51px' lengthAdjust='spacingAndGlyphs'>Minimum added dwellings needed to avoid any doubling up in Canadian Metro Areas</text>
 <text x='498.52' y='352.63' text-anchor='end' style='font-size: 8.80px; font-family: "Times New Roman";' textLength='239.24px' lengthAdjust='spacingAndGlyphs'>Data: StatCan Census 2011 (NHS), 2016, 2021 PUMF (individuals)</text>
 </g>
 </svg>

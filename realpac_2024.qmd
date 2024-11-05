@@ -1,0 +1,485 @@
+---
+title: "What happens when supply starts to catch up?"
+subtitle: "Modelling the impact of supply/demand shifts on rents."
+data: "Nov 5, 2024"
+author: 
+  name: "Jens von Bergmann"
+  affiliation: "MountainMath Software and Analytics"
+format: 
+  revealjs:
+    logo: mm_stamp_alpha.png
+    css: ["default","default-fonts"]
+    theme: mm_theme.scss
+    background-color: #F8F4F0
+#css: shift_heading_up.css
+editor: visual
+fontsize: 20pt
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(canpumf)
+library(mountainmathHelpers)
+```
+
+# Housing shortage
+
+CMHC suggests a shortage of 3.5 millions dwelling units above BAU needed to restore affordability to early 2000s level. Most of this is to make up for Canada's current housing shortage.
+
+These estimates rely on demand elasticity estimates. When adding housing, by how much do prices and rents drop?
+
+## Econometric modelling
+
+:::: columns
+::: {.column width="50%"}
+
+![](images/yvr_demand_elasticity.png)
+Suggests a 1% increase in housing stock lowers prices and rents by ~ 4%. (Literature suggest a point estimate closer to 2.5%.)
+
+(Taken from our [modelling report for BC's SSMUH and TOA policies](https://news.gov.bc.ca/files/bc_SSMUH_TOA_scenarios_Final.pdf).)
+
+:::
+::: {.column width="50%"}
+
+CMHC estimates rely on econometric time series modelling of demand elasticities similar to this:
+
+*   specifies a structural model
+*   try to estimate elasticities based on historical changes in demographics, prices, housing stock, income, and other macroeconomic factors
+*   has to overcome significant endogeneity issues
+*   comes with considerable uncertainties
+
+#### Can we derive similar estimates from demographic models?
+
+:::
+::::
+
+# Demographic estimates of shortages
+
+How have people distributed over housing since 1971?
+
+```{r}
+get_phm_timeline <- function() {
+  
+  classify_age <- function(a){
+    aa=a |>
+      str_extract("\\d+") |>
+      as.integer() |> 
+      pretty_cut(breaks=c(0,5,10,15,18,seq(20,85,5),Inf),
+                 right=FALSE) |>
+      str_extract("\\d+") |> 
+      as.integer()
+    
+    case_when(is.na(aa) ~ "Not available",
+              aa<5 ~ "0 to 4 years",
+              aa==15 ~ "15 to 17 years",
+              aa==18 ~ "18 to 19 years",
+              aa>=85 ~ "85 years ond over",
+              TRUE ~ paste0(aa," to ",aa+4," years"))
+  }
+  
+  harmonize_pr <- function(pr) {
+    provinces <- c("Newfoundland and Labrador",
+                   "Prince Edward Island",
+                   "Nova Scotia",
+                   "New Brunswick",
+                   "Quebec",
+                   "Ontario",
+                   "Manitoba",
+                   "Saskatchewan",
+                   "Alberta",
+                   "British Columbia",
+                   "Northern Canada")
+    recode(pr,!!!setNames(provinces,toupper(provinces))) |>
+      recode("NEWFOUNDLAND"="Newfoundland and Labrador",
+             "Newfoundland"="Newfoundland and Labrador",
+             "PEI/YUKON/NWT"="Prince Edward Island, Yukon Territory, Northwest Territories and Nunavut",
+             "Northern Canada"="Yukon Territory, Northwest Territories and Nunavut",
+             "Yukon/Northwest Territories"="Yukon Territory, Northwest Territories and Nunavut",
+             "Yukon and Northwest"="Yukon Territory, Northwest Territories and Nunavut",
+             "Yukon & Northwest Territories"="Yukon Territory, Northwest Territories and Nunavut")
+  }
+  
+  harmonize_cma <- function(cma) {
+    cma |>
+      gsub(" - \\d{3}","",x=_) |>
+      recode("Other census metropolitan areas, Census Agglomerations and other geographies"="Other",
+             "Other census metropolitan areas, census agglomerations and other geographies"="Other",
+             "Not Applicable"="Other",
+             "Not applicable"="Other",
+             "NOT APPLICABLE"="Other",
+             "Sudbury(580)+Thunder Bay(595)"="Greater Sudbury – Thunder Bay",
+             "Sudbury/Thunder Bay"="Greater Sudbury – Thunder Bay",
+             "Greater Sudbury / Grand Sudbury – Thunder Bay"="Greater Sudbury – Thunder Bay",
+             "Greater Sudbury/Grand Sudbury – Thunder Bay"="Greater Sudbury – Thunder Bay",
+             "Greater Sudbury/Grand Sudbury – Thunder Bay"="Greater Sudbury – Thunder Bay",
+             "Sudbury and Thunder Bay"="Greater Sudbury – Thunder Bay",
+             "Ottawa Hull"="Ottawa – Gatineau",
+             "Ottawa-Hull"="Ottawa – Gatineau",
+             "St. Catharines - Niagara"="St. Catharines – Niagara",
+             "St. Catharines-Niagara"="St. Catharines – Niagara",
+             "St.Catharines/Niagara"="St. Catharines – Niagara",
+             "Sherbrooke(433)+Trois-Riv(442)"="Sherbrooke – Trois-Rivières",
+             "Sherbrooke/Trois-Riv"="Sherbrooke – Trois-Rivières",
+             "Sherbrooke and Trois-Rivières"="Sherbrooke – Trois-Rivières",
+             "Regina(705) + Saskatoon(725)"="Regina – Saskatoon",
+             "Regina & Saskatoon"="Regina – Saskatoon",
+             "Montreal"="Montréal",
+             "Kelowna – Abbotsford"="Kelowna – Abbotsford-Mission",
+             "Quebec"="Québec",
+             "Regina/Saskatoon"="Regina – Saskatoon",
+             "Regina and Saskatoon"="Regina – Saskatoon",
+             "QUEBEC"="Québec",
+             "ST. CATHARINES-NIAGARA"="St. Catharines – Niagara",
+             "TORONTO"="Toronto",
+             "VANCOUVER"="Vancouver",
+             "MONTREAL"="Montréal",
+             "WINNIPEG"="Winnipeg",
+             "KITCHENER"="Kitchener",
+             "LONDON"="London",
+             "HALIFAX"="Halifax",
+             "OTTAWA-HULL"="Ottawa – Gatineau",
+             "TORONTO CMA"="Toronto",
+             "VANCOUVER CMA"="Vancouver",
+             "MONTREAL CMA"="Montréal",
+             "HAMILTON" = "Hamilton",
+             "EDMONTON" = "Edmonton",
+             "CALGARY" = "Calgary"
+      )
+  }
+  
+  data <- seq(1971,2021,5) |>
+    as.character() |>
+    map_df(\(year) {
+      # print(year)
+      d<-get_pumf("Census",year) |>
+        label_pumf_data(rename_columns = FALSE) 
+      
+      if (year=="1971") {
+        d_cma <- d |>
+          rename(CMA=CMACODE) |>
+          rename(PR=GEOCODE) |>
+          filter(HHLDCLAS=="PRIVATE HOUSEHOLD") |>
+          mutate(PRIHM= HHLDREL=="HEAD OF HOUSEHOLD") |>
+          mutate(AGEGRP=classify_age(AGE)) |>
+          summarize(Count=n()*50,.by=c(CMA,PR,AGEGRP,PRIHM))
+        
+        d_pr<-get_pumf("Census","1971 (individuals) PR") |>
+          label_pumf_data(rename_columns = FALSE) |>
+          rename(CMA=CMACODE) |>
+          rename(PR=GEOCODE) |>
+          filter(HHLDCLAS=="PRIVATE HOUSEHOLD") |>
+          mutate(PRIHM= HHLDREL=="HEAD OF HOUSEHOLD") |>
+          mutate(AGEGRP=classify_age(AGE)) |>
+          summarize(Count=n()*50,.by=c(CMA,PR,AGEGRP,PRIHM)) 
+        
+       d <- bind_rows(d_cma |> mutate(Count=-Count),d_pr) |>
+         mutate(CMA="Other") |>
+         summarize(Count=sum(Count),.by=c(CMA,PR,AGEGRP,PRIHM)) |>
+         bind_rows(d_cma)
+        
+      } else if (year=="1976") {
+        d <- d |>
+          filter(HHLDCLAS=="PRIVATE HOUSEHOLD") |>
+          rename(PR=PROV) |>
+          mutate(PRIHM= HHDLREL=="HEAD OF HOUSEHOLD") |>
+          mutate(AGEGRP=classify_age(AGE)) |>
+          summarize(Count=n()*50,.by=c(CMA,PR,AGEGRP,PRIHM))
+      }  else if (year=="1981") {
+        d <- d |>
+          filter(HHCLASS=="PRIVATE") |>
+          filter(HMAIN!="NOT APPLICABLE") |>
+          rename(PR=PROV) |>
+          mutate(PRIHM= HMAIN=="YES") |>
+          mutate(AGEGRP=classify_age(AGE)) |>
+          summarize(Count=n()*50,.by=c(CMA,PR,AGEGRP,PRIHM))
+      }  else if (year=="1986") {
+        d <- d |>
+          rename(CMA=CMAPUST) |>
+          filter(HHCLASS=="Private household") |>
+          filter(HMAINP!="Not applicable") |>
+          rename(PR=PROV) |>
+          mutate(PRIHM= HMAINP=="Yes") |>
+          mutate(AGEGRP=classify_age(AGEP)) |>
+          summarize(Count=n()*50,.by=c(CMA,PR,AGEGRP,PRIHM))
+      }  else if (year=="1991") {
+        d <- d |>
+          rename(CMA=CMAPUMFP) |>
+          filter(HHCLASSP=="Private household") |>
+          filter(PRMAINP!="Not applicable") |>
+          rename(PR=PROVP) |>
+          mutate(PRIHM= PRMAINP=="Primary household maintainer") |>
+          mutate(AGEGRP=classify_age(AGEP)) |>
+          summarize(Count=sum(WEIGHTP),.by=c(CMA,PR,AGEGRP,PRIHM))
+      }  else if (year=="1996") {
+        d <- d |>
+          rename(CMA=CMAPUMFP) |>
+          filter(HHCLASSP=="Private Household") |>
+          filter(PRMAINP!="Not applicable") |>
+          rename(PR=PROVP) |>
+          mutate(PRIHM= PRMAINP=="PrimaryHhldMaintainr") |>
+          mutate(AGEGRP=classify_age(AGEP)) |>
+          summarize(Count=sum(WEIGHTP),.by=c(CMA,PR,AGEGRP,PRIHM))
+      }  else if (year=="2001") {
+        d <- d |>
+          rename(PR=PROVP) |>
+          rename(CMA=CMAP) |>
+          filter(HHCLASSP=="Private household") |>
+          filter(PRMAINP!="Not applicable") |>
+          mutate(PRIHM= PRMAINP=="Primary household maintainer") |>
+          mutate(AGEGRP=classify_age(AGEP)) |>
+          summarize(Count=sum(WEIGHTP),.by=c(CMA,PR,AGEGRP,PRIHM))
+      }  else if (year=="2006") {
+        d <- d |>
+          filter(HHCLASS=="Private household") |>
+          filter(PRIHM!="Not applicable") |>
+          mutate(PRIHM= PRIHM=="Person is primary maintainer") |>
+          summarize(Count=sum(WEIGHT),.by=c(CMA,PR,AGEGRP,PRIHM))
+      } else {
+        d <- d |>
+          filter(PRIHM!="Not applicable") |>
+          mutate(PRIHM= PRIHM=="Person is primary maintainer") |>
+          summarize(Count=sum(WEIGHT),.by=c(CMA,PR,AGEGRP,PRIHM))
+      }
+      d |>
+        mutate(Year=year)
+    }) |>
+    mutate(CMA=harmonize_cma(CMA)) |>
+    mutate(PR=harmonize_pr(PR)) 
+  
+  data |>
+    mutate(AGEGRP=recode(AGEGRP,
+                         "5 to 6 years"="5 to 9 years",
+                         "7 to 9 years"="5 to 9 years",
+                         "10 to 11 years"="10 to 14 years",
+                         "12 to 14 years"="10 to 14 years",
+                         "85 years and over"="85 years ond over")) |>
+    summarize(Count=sum(Count),.by=c(CMA,PR,AGEGRP,PRIHM,Year)) 
+}
+```
+
+
+```{r}
+phm_data <- simpleCache(get_phm_timeline(),"phm_timeline.rds",path=here::here("data"),refresh=FALSE)
+
+phm_data_cma <- phm_data |>
+  mutate(AGEGRP=recode(AGEGRP,"15 to 17 years"="15 to 19 years",
+                       "18 to 19 years"="15 to 19 years",
+                       "85 years and over"="85 years ond over")) |>
+  filter(AGEGRP != "Not available") %>%
+  bind_rows((.) |> mutate(CMA="Canada")) |>
+  summarize(Count=sum(Count),.by=c(CMA,AGEGRP,PRIHM,Year)) |>
+  filter(!(AGEGRP %in% c("0 to 4 years","10 to 11 years","10 to 14 years","7 to 9 years",
+                         "12 to 14 years","5 to 6 years","5 to 9 years","Less than 5 years")))
+
+phm_data_canada <- phm_data_cma |> filter(CMA=="Canada") |>
+  mutate(base_hmr=Count/sum(Count),.by=c(Year,AGEGRP)) |>
+  filter(PRIHM) |>
+  select(-PRIHM,-CMA,-Count) 
+
+pumf_cma_timeline <- phm_data_cma |>
+  mutate(Households=ifelse(PRIHM,Count,0)) |>
+  mutate(People=sum(Count),.by=c(Year,CMA,AGEGRP)) |>
+  filter(PRIHM) |>
+  left_join(phm_data_canada |> filter(Year=="1981") |> select(AGEGRP,base_hmr),by="AGEGRP") |>
+  mutate(`Age-expected households`=People*base_hmr) |>
+  summarize(across(matches("household"),sum),.by=c(CMA,Year)) |>
+  mutate(ratio=Households/`Age-expected households`) %>%
+  mutate(CMA=factor(CMA,levels=filter(.,Year=="2021") |> arrange(desc(ratio)) |> pull(CMA)))
+  
+pumf_cma_timeline |>
+  filter(CMA %in% c("Canada","Vancouver","Toronto","Montréal","Québec","Ottawa – Gatineau",
+                    "Calgary","Edmonton","Hamilton")) |>
+  ggplot(aes(x=as.integer(Year),y=ratio,colour=CMA)) +
+  geom_point(shape=21) +
+  geom_line() +
+  scale_x_continuous(breaks=seq(1971,2021,5)) +
+  #scale_color_manual(values=sanzo::trios$c149) +
+  labs(title="Age-expected households vs actual households in Canada",
+       x=NULL,
+       colour="Metro area",
+       y="Households / age-expected households\n(based on 1981 Canadian household maintainer rates)",
+       caption="StatCan Census 1971-2021 PUMF (individuals)")
+```
+
+Household formation in most places in Canada peaked around 1981.
+
+## How does this play out in detail?
+
+![](images/non-mhu.svg)
+
+## Benchmarking shortages
+
+:::: columns
+::: {.column width="60%"}
+
+How much housing is needed to eliminate all doubling up?
+
+![](images/non-mhu-shortfall.svg)
+Some doubling up may be voluntary, Quebec CMA puts a bound on that.
+
+:::
+::: {.column width="40%"}
+
+The regions with the highest housing shortfall are also the regions with the highest rents, and this is no coincidence.
+
+:::
+::::
+
+## Shortages and rents
+
+
+:::: columns
+::: {.column width="60%"}
+
+![](images/non-mhu-shortfall-rents.svg)
+
+There is a strong relationship between housing shortages and rents.
+
+
+:::
+::: {.column width="40%"}
+
+Other factors matter too, in particular:
+
+*   incomes
+*   cultural tolerance of doubling up
+
+```{r}
+slope <- 0.2330284
+
+ratio_response <- function(housing_increase) {
+  1-housing_increase/(1+housing_increase)
+}
+
+supply_response <- function(housing_increase) {
+ exp(log(ratio_response(housing_increase))/slope)-1
+}
+```
+
+
+Relationship suggests that increasing the housing stock in Vancouver by 1% reduces rents by `r scales::percent(-supply_response(0.01),accuracy=0.1)`, similar to econometric estimate.
+
+(This does not account for migration response which reduces the effect.)
+
+:::
+::::
+
+## Non-permanent residents and immigrants
+
+The federal government announced cuts to non-permanent residents, what does that mean for housing?
+
+```{r pumf-import}
+d_2016 <- canpumf::get_pumf("Census","2016") |>
+  canpumf::label_pumf_data(rename_columns = FALSE) 
+d_2021 <- canpumf::get_pumf("Census","2021") |>
+  canpumf::label_pumf_data(rename_columns = FALSE) 
+
+
+hmr_data <- bind_rows(d_2016 |> 
+                        # mutate(Status=case_when(IMMSTAT!="Immigrants" &
+                        #        (YRIMM %in% c("2011" ,"2012", "2013", "2014", "2015 to 2016")) ~ "Recent immigrant",
+                        #        TRUE ~ IMMSTAT)) |>
+                        mutate(Status=IMMSTAT) |>
+                        select(PRIHM,AGEGRP,Status,matches("WEIGHT|WT\\d+")) |> 
+                        mutate(Year="2016"),
+                      d_2021 |> 
+                        # mutate(Status=case_when(IMMSTAT!="Immigrants" &
+                        #        (YRIM %in% c("2016", "2017", "2018", "2019", "2020 to 2021")) ~ "Recent immigrant",
+                        #        TRUE ~ IMMSTAT)) |>
+                        mutate(Status=IMMSTAT) |>
+                        select(PRIHM,AGEGRP,Status,matches("WEIGHT|WT\\d+")) |> 
+                        mutate(Year="2021")) |>
+  filter(PRIHM != "Not applicable") |>
+  filter(Status != "Not available") |>
+  filter(AGEGRP != "Not available") |>
+  summarize(across(matches("WEIGHT|WT\\d+"),sum),.by=c(PRIHM,AGEGRP,Status,Year)) |>
+  pivot_longer(matches("WEIGHT|WT\\d+"),names_to="Weight",values_to="Count") |>
+  mutate(Share=Count/sum(Count),.by=c(AGEGRP,Status,Weight,Year)) 
+```
+
+
+:::: columns
+::: {.column width="50%"}
+```{r fig.width=5.5}
+pop_age <- d_2021 |> 
+  filter(AGEGRP != "Not available") |>
+  summarize(Count=sum(WEIGHT),.by=c(AGEGRP)) |>
+  mutate(Share=Count/sum(Count))
+
+child_ages <- c("0 to 4 years", "5 to 6 years", "7 to 9 years", "10 to 11 years", "12 to 14 years", "15 to 17 years")
+
+bind_rows(
+hmr_data |> 
+  filter(!(AGEGRP %in% child_ages)) |>
+  filter(PRIHM=="Person is primary maintainer") |>
+  left_join(pop_age |> select(AGEGRP,w=Share),by="AGEGRP") |>
+  summarize(Share=weighted.mean(Share,w),.by=c(Status,Weight,Year)) |>
+  mutate(Type="Age adjusted"),
+hmr_data |> 
+  filter(!(AGEGRP %in% child_ages)) |>
+  summarize(Count=sum(Count),.by=c(PRIHM,Status,Weight,Year)) |> 
+  mutate(Share=Count/sum(Count),.by=c(Weight,Status,Year)) |>
+  filter(PRIHM=="Person is primary maintainer") |>
+  mutate(Type="Crude")) |>
+  ggplot(aes(y=fct_rev(Status),x=Share,fill=Type)) +
+    # geom_bar(stat="identity",position="dodge",
+    #        data=~filter(.,Weight=="WEIGHT")) +
+  geom_boxplot(position="dodge") +
+  facet_wrap(~Year) +
+  scale_x_continuous(labels=scales::percent,breaks=seq(0,1,0.05)) +
+  labs(title="Household maintainer rates of adults",
+       caption="StatCan Census 2021 PUMF (individuals)",
+       y=NULL,x="Household maintianer rate")
+```
+:::
+::: {.column width="50%"}
+
+Non-permanent residents form households at significantly lower rates than immigrants and non-immigrants.
+
+Income matters too, and newcomers on average have lower incomes.
+
+NPR caught in the census are likely higher income than the average NPR, under-coverage of students and temporary workers is higher.
+
+:::
+::::
+
+## Bank of Canad estimates for US
+
+New [working paper by BoC](https://www.bankofcanada.ca/wp-content/uploads/2024/10/swp2024-40.pdf) estimates that immigration inflows equal to 1% of a regions population increased prices by 3.8% and rents by 2.2%.
+
+Effects are heterogeneous and depend on
+
+*   education level (proxying for earning potential)
+*   supply elasticity of housing
+
+For **highly educated immigrants** into regions with **low supply elasticity** the effect on prices is 6% to 8%.
+
+For **low education immigrants** into **high supply elasticity** regions it is 0 to 2%.
+
+(Complex estimates, comes with considerable uncertainty.)
+
+## Summary
+
+*   Rule of thumb: For every 1% increase in housing stock we should expect a 3%-4% decrease in rents.
+*   (Traditional literature has results around 2% impact of new supply on prices and rents.)
+*   When changing population growth rates, impacts are analogous but with reversed sign. But demographics and economics of newcomers relative to existing population matters. As does supply response.
+    -   in low-supply elasticity regions like Vancouver and Toronto: effects can be larger for increases in immigration
+    -   for lower income newcomers like NPRs: effects are smaller
+    -   Housing consumption of NPR caught in census is around 75% of average resident. Likely lower for students and temporary workers.
+
+## Thank you!
+
+These slides are online at <https://mountainmath.ca/realpac_2024/>. 
+
+::: {style="padding-top:200px;"}
+:::
+
+You can reach me at [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), [email (jens@mountainmath.ca)](mailto::jens@mountainmath.ca), and with decreasing frequency on [Twitter (\@vb_jens)](https://twitter.com/vb_jens)
+
+
+
