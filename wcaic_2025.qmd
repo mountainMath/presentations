@@ -1,7 +1,7 @@
 ---
-title: "What happens when supply starts to catch up?"
-subtitle: "Modelling the impact of supply/demand shifts on rents."
-data: "Nov 5, 2024"
+title: "Shifting demographics and the rental market"
+subtitle: "How are immigration and in-migration changing tenant needs and demand?"
+date: "Tuesday, 22 April 2025 "
 author: 
   name: "Jens von Bergmann"
   affiliation: "MountainMath Software and Analytics"
@@ -14,6 +14,11 @@ format:
 #css: shift_heading_up.css
 editor: visual
 fontsize: 20pt
+bibliography: common_literature.bib
+nocite: |
+  @bc_ssmuh_toa.2023,
+  @housing_shortages_doubled_up_households.2024,
+  @mhu.2025
 execute:
   echo: false
   warning: false
@@ -24,14 +29,77 @@ execute:
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(canpumf)
+library(cansim)
 library(mountainmathHelpers)
 ```
 
-# Housing shortage
+# The value of housing
 
-CMHC suggests a shortage of 3.5 millions dwelling units above BAU needed to restore affordability to early 2000s level. Most of this is to make up for Canada's current housing shortage.
+**People derive tremendous value from living in housing!**
 
-These estimates rely on demand elasticity estimates. When adding housing, by how much do prices and rents drop?
+Housing provides
+
+::: {.fragment}
+-   shelter
+:::
+::: {.fragment}
+-   location
+:::
+::: {.fragment}
+-   privacy
+:::
+
+
+## Location
+
+BC has a housing shortage, but housing in the wrong location is not useful.
+
+::::: columns
+::: {.column width="50%"}
+
+![](images/site_c_housing.png)
+
+:::
+::: {.column width="50%"}
+
+
+Demand for housing varies strongly by location.
+
+* When housing demand falls, outlying areas are hit first and hardest.
+* When housing demand rises, prices & rents in central areas rise first.
+
+:::
+::::
+
+
+
+## Privacy
+
+Housing affords various levels of privacy:
+
+-   Bedrooms: People might share bedrooms or have separate bedrooms
+-   Dwelling units: People might share a dwelling unit or live in separate dwelling units
+
+Privacy considerations matter a lot, doubling up is the **main mechanism** how people respond to housing shortages/high rents.
+
+
+Rent/sf for smaller (Studio or 1 Bedroom) vs larger (2 Bedroom or larger) units 
+
+![](images/cov_rent_sf.png){height=350px}
+
+# Demand for housing
+
+The two main ingredients of housing demand are:
+
+* demographic pressure
+* income
+
+Incomes generally change slowly. 
+
+To estimate how changes in demographics (and changes in housing supply) will affect housing costs we need to estimate how the demand curve depends on demographics.
+
+This **demand elasticity** is the central ingredient to understand how rents and prices react to changes in supply and demographic pressures. 
+
 
 ## Econometric modelling
 
@@ -43,14 +111,14 @@ These estimates rely on demand elasticity estimates. When adding housing, by how
 :::
 
 ::: {.column width="50%"}
-CMHC estimates rely on econometric time series modelling of demand elasticities similar to this:
+This relies on econometric time series modelling:
 
 -   specifies a structural model
 -   try to estimate elasticities based on historical changes in demographics, prices, housing stock, income, and other macroeconomic factors
 -   has to overcome significant endogeneity issues
 -   comes with considerable uncertainties
 
-#### Can we derive similar estimates from demographic models?
+#### Can we understand this more directly looking via demographic modelling?
 :::
 :::::
 
@@ -354,6 +422,97 @@ Relationship suggests that increasing the housing stock in Vancouver by 1% reduc
 :::
 :::::
 
+
+## Metro level demographic growth
+
+```{r}
+geo_uids <- c("825", "835", "933", "935") #,"535","462")
+cma_grep_string <- "Vancouver|Calgary|Edmonto|Victoria \\(CMA|Victoria, Bri"
+
+pop1 <- get_cansim_connection("17-10-0148",refresh = "auto") |>
+  filter(Gender=="Total - gender",`Age group`=="All ages") |>
+  filter(GeoUID %in% geo_uids) |>
+  collect_and_normalize(default_month = 1) |>
+  mutate(Name=gsub(" \\(CMA.+","",GEO)) |>
+  select(Date,Name,Population=val_norm)
+
+migration_data_raw.1 <- get_cansim_connection("17-10-0154",refresh = "auto") |>
+  collect_and_normalize(default_month = 1)
+
+migration_data_raw.2 <- get_cansim_connection("17-10-0141",refresh = "auto") %>%
+  collect_and_normalize(default_month = 1) 
+
+migration_data_raw.3 <- get_cansim_connection("17-10-0087",refresh = "auto") %>%
+  collect_and_normalize(default_month = 1) 
+
+migration_data_raw.4 <- get_cansim_connection("17-10-0004",refresh = "auto") %>%
+  collect_and_normalize(default_month = 1) |>
+  filter(`Migration movement`=="In-migration")
+
+
+pop_change.1 <- get_cansim_connection("17-10-0149",refresh = "auto") |>
+  filter(Gender=="Total - gender",`Age group`=="All ages",GeoUID %in% geo_uids) |>
+  collect_and_normalize(default_month = 1)
+
+pop_change.2 <- get_cansim_connection("17-10-0136",refresh = "auto") |>
+  filter(Sex=="Both sexes",`Age group`=="All ages",GeoUID %in% geo_uids) |>
+  collect_and_normalize(default_month = 1)
+
+geo_names <- pop_change.1$GEO |> unique()
+
+domestic_in <- bind_rows(migration_data_raw.1,migration_data_raw.2,migration_data_raw.3,migration_data_raw.4) |>
+  filter(!grepl("\\.",`Hierarchy for GEO`)) |>
+  #filter(`Geography of destination` %in% geo_names) |>
+  filter(grepl(cma_grep_string,`Geography of destination`)) |>
+  summarize(val_norm = sum(val_norm),.by=c(REF_DATE,Date,`Geography of destination`)) |>
+  mutate(Name=gsub(" \\(CMA.+|, .+","",`Geography of destination`)) 
+
+domestic_out <- bind_rows(migration_data_raw.1,migration_data_raw.2,migration_data_raw.3,migration_data_raw.4) |>
+  filter(!grepl("\\.",`Hierarchy for Geography of destination`)) |>
+  #filter(`Geography of destination` %in% geo_names) |>
+  filter(grepl(cma_grep_string,GEO)) |>
+  summarize(val_norm = -sum(val_norm),.by=c(REF_DATE,Date,GEO)) |>
+  mutate(Name=gsub(" \\(CMA.+|, .+","",GEO)) 
+
+
+comp_cats <- bind_rows(pop_change.1,pop_change.2|> filter(Date>max(pop_change.1$Date))) %>% 
+  mutate(`Components of population growth`=droplevels(`Components of population growth`)) %>%
+  categories_for_level(.,"Components of population growth") |>
+  unique()
+
+migration_data <- bind_rows(pop_change.1,pop_change.2 |> filter(Date>max(pop_change.1$Date))) %>%
+  mutate(Name=gsub(" \\(CMA.+","",GEO)) %>%
+  filter(`Components of population growth` %in% comp_cats) |>
+  select(Date,Name,Component=`Components of population growth`,value=val_norm) |>
+  inner_join(domestic_in |> select(REF_DATE,Date,Name,domestic_in=val_norm),by=c("Date","Name")) %>%
+  inner_join(domestic_out |> select(Date,Name,domestic_out=val_norm),by=c("Date","Name")) %>%
+  #left_join(summarize(.,net=sum(value),.by=c(Date,Name)),by=c("Date","Name")) |>
+  pivot_wider(names_from=Component, values_from=value) |>
+  mutate(external=Immigrants-Emigrants-coalesce(`Net temporary emigration`,0)+`Net non-permanent residents`) |>
+  pivot_longer(c(Immigrants,`Net non-permanent residents`,domestic_in#,domestic_out
+                 ),names_to="Type",values_to="Value") |>
+  left_join(pop1,by=c("Date","Name"))
+
+migration_data |>
+  #filter(Date<=as.Date("2021-01-01")) |>
+  ggplot(aes(x=Date,y=Value/Population,colour=Type)) +
+  geom_line() +
+  facet_wrap(~Name) +
+  scale_y_continuous(labels=scales::percent) +
+  theme(legend.position='bottom') +
+  scale_color_manual(#values=sanzo::duos$c103,
+                     #values=MetBrewer::met.brewer("Hokusai1",n=4),
+                     values=sanzo::trios$c157,
+                     labels=c("domestic_in"="Domestic in-migration",
+                              "domestic_out"="Domestic out-migration",
+                              "external"="External in-migration")) +
+  labs(title=paste0("Growth components for selected metro areas in Western Canada up to ",max(migration_data$REF_DATE)),
+       x=NULL,y="Relative growth",colour="Component",
+       caption="StatCan Tables 17-10-0148, 17-10-0154, 17-10-0141, 17-10-0087, 17-10-0004, 17-10-0149, 17-10-0136") 
+```
+Trends are fairly stable, with net NPR surging in recent periods. 
+
+
 ## Non-permanent residents and immigrants
 
 The federal government announced cuts to non-permanent residents, what does that mean for housing?
@@ -415,11 +574,14 @@ hmr_data |>
     #        data=~filter(.,Weight=="WEIGHT")) +
   geom_boxplot(position="dodge") +
   facet_wrap(~Year) +
+  theme(legend.position = "bottom") +
+  scale_fill_manual(values=sanzo::duos$c095) +
   scale_x_continuous(labels=scales::percent,breaks=seq(0,1,0.05)) +
   labs(title="Household maintainer rates of adults",
        caption="StatCan Census 2021 PUMF (individuals)",
        y=NULL,x="Household maintianer rate")
 ```
+
 :::
 
 ::: {.column width="50%"}
@@ -431,35 +593,29 @@ NPR caught in the census are likely higher income than the average NPR, under-co
 :::
 :::::
 
-## Bank of Canad estimates for US
 
-New [working paper by BoC](https://www.bankofcanada.ca/wp-content/uploads/2024/10/swp2024-40.pdf) estimates that immigration inflows equal to 1% of a regions population increased prices by 3.8% and rents by 2.2%.
+# Summary
 
-Effects are heterogeneous and depend on
-
--   education level (proxying for earning potential)
--   supply elasticity of housing
-
-For **highly educated immigrants** into regions with **low supply elasticity** the effect on prices is 6% to 8%.
-
-For **low education immigrants** into **high supply elasticity** regions it is 0 to 2%.
-
-(Complex estimates, comes with considerable uncertainty.)
-
-## Summary
-
--   Rule of thumb: For every 1% increase in housing stock we should expect a 3%-4% decrease in rents.
--   (Traditional literature has results around 2% impact of new supply on prices and rents.)
--   When changing population growth rates, impacts are analogous but with reversed sign. But demographics and economics of newcomers relative to existing population matters. As does supply response.
-    -   in low-supply elasticity regions like Vancouver and Toronto: effects can be larger for increases in immigration
+-   Rule of thumb: For every 1% increase in housing stock relative to MHU we should expect a 3%-4% decrease in rents.
+-   (There is uncertainty around this, traditional literature has results around 2% impact of new supply on prices and rents.)
+-   Rising incomes dampens this somewhat.
+-   These are "long run" effects, short run effects (~2 years) can be larger.
+-   Demographics and economics of newcomers relative to existing population matters. As does supply response.
+    -   in low-supply elasticity regions like Vancouver and Toronto: effects can be larger for increases in immigration (but supply-elasticity matters much less for decreases in immigration)
     -   for lower income newcomers like NPRs: effects are smaller
     -   Housing consumption of NPR caught in census is around 75% of average resident. Likely lower for students and temporary workers.
 
 ## Thank you!
 
-These slides are online at <https://mountainmath.ca/realpac_2024/>.
+These slides are online at <https://mountainmath.ca/wcaic_2025/>.
 
-::: {style="padding-top:200px;"}
+
+### References and further reading
+
+::: {#refs}
 :::
 
-You can reach me at [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), [email (jens\@mountainmath.ca)](mailto::jens@mountainmath.ca), and with decreasing frequency on [Twitter (\@vb_jens)](https://twitter.com/vb_jens)
+::: {style="padding-top:100px;"}
+:::
+
+You can reach me via [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), or [email (jens\@mountainmath.ca)](mailto::jens@mountainmath.ca).
