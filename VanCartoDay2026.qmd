@@ -1,0 +1,56 @@
+---
+title: "CensusMapper 2.0"
+subtitle: "VanCartoDay"
+date: "Friday, May 1 2026"
+author: 
+  - name: "Jens von Bergmann"
+    affiliation: "MountainMath"
+  - name: "Leia Chen"
+    affiliation: "CS @ UBC, MountainMath"
+format: 
+  revealjs:
+    embed-resources: true
+    logo: mm_stamp_alpha.png
+    css: ["default","default-fonts"]
+    theme: mm_theme.scss
+    background-color: #F8F4F0
+#css: shift_heading_up.css
+editor: visual
+fontsize: 20pt
+bibliography: common_literature.bib
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+## CensusMapper 1.0
+
+CensusMapper 1.0 went live in 2015. [@census-mapper.2015]
+
+<a href="https://censusmapper.ca/#11/49.2432/-123.1252" target="_blank1"><img src="images/censusmapper1.png" height="500"/></a>
+
+## CensusMapper 2.0
+
+Started thinking about CensusMapper 2021, did not start working on it until 2025. [@censusmapper-p-review.2021]
+
+<a href="https://preprod.censusmapper.ca/maps/3053#10/49.239/-122.9224" target="_blank2"><img src="images/censusmapper2.png" height="500"/></a>
+
+
+## Thank you!
+
+
+### References and further reading
+
+::: {#refs}
+:::
+
+::: {style="padding-top:100px;"}
+:::
+
+### Contact information
+
+* Jens via [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), or [email (jens\@mountainmath.ca)](mailto::jens@mountainmath.ca)
+* Leia at [Linked \@leiahjchen](https://www.linkedin.com/in/leiahjchen/).
+
