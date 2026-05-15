@@ -1,0 +1,77 @@
+---
+title: "Making Canadian Data Accessible"
+subtitle: "Developing Minds 2026"
+date: "Friday, May 15 2026"
+author: 
+  - name: "Jens von Bergmann"
+    affiliation: "MountainMath"
+format: 
+  revealjs:
+    embed-resources: true
+    logo: mm_stamp_alpha.png
+    #css: ["default","default-fonts"]
+    theme: mm_theme.scss
+    background-color: #F8F4F0
+#css: shift_heading_up.css
+nocite: |
+  @canadian_data,
+  @censusmapper-20.2026,
+  @introducing-canviz.2026
+  @cansim
+  @cancensus
+  @cmhc
+  @tongfen
+editor: visual
+fontsize: 20pt
+bibliography: common_literature.bib
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: true
+---
+
+## CensusMapper
+
+Canada-wide interactive mapping platform for Census data
+
+<a href="https://censusmapper.ca/maps/3608?z=10.00&lat=49.1991&lng=-122.8434" target="_blank2"><img src="images/immigrant_generation_van.png" height="500"/></a>
+
+## CanViz
+
+Find and graph StatCan time series data
+
+<a href="https://canviz.mountainmath.ca/plot?v=96527517%2C96527757%2C96528237%2C96528717%2C96529197" target="_blank2"><img src="images/canviz.png" height="500"/></a>
+
+## Open Analysis
+
+::::: columns
+::: {.column width="50%"}
+For students looking for more advanced analysis I have a collection of R packages to facilitate working with Canadian data. These are designed to be:
+
+- Beginner friendly
+- Can copy-paste code to import data from CensusMapper and CanViz
+- Enable transparent, reproducible and adaptable analysis
+- [Book project](https://mountainmath.github.io/canadian_data/) taking a problem-based approach to teaching how to use Canadian data for analysis.
+:::
+
+::: {.column width="50%"}
+<a href="https://mountainmath.github.io/canadian_data/"><img src="https://mountainmath.github.io/canadian_data/cover.png"/></a>
+:::
+:::::
+
+## Thank you!
+
+The slides are online at [mountainmath.ca/DevelopingMinds2026/](https://mountainmath.ca/DevelopingMinds2026/).
+
+### References and further reading
+
+::: {#refs}
+:::
+
+::: {style="padding-top:100px;"}
+:::
+
+### Contact information
+
+- Jens via [Bluesky (\@jensvb)](https://bsky.app/profile/jensvb.bsky.social), [Linkedin (\@vb-jens)](https://www.linkedin.com/in/vb-jens/), or [email (jens\@mountainmath.ca)](mailto::jens@mountainmath.ca)
